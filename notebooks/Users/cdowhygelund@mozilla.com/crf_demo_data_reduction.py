@@ -13,11 +13,11 @@ spark.conf.set('spark.databricks.queryWatchdog.enabled', False)
 
 from datetime import datetime as dt, timedelta, date
 
-now = date(2017, 5, 4)
+now = date(2017, 4, 27)
 # now = datetime.now().date()
 
-start_date = dt.strftime(now - timedelta(7), "%Y%m%d")
-end_date = dt.strftime(now - timedelta(1), "%Y%m%d")
+start_date = dt.strftime(now - timedelta(6), "%Y%m%d")
+end_date = dt.strftime(now, "%Y%m%d")
 
 # COMMAND ----------
 
@@ -284,21 +284,29 @@ from pyspark.sql.functions import pandas_udf, PandasUDFType, lit
 from pyspark.sql.types import StringType, ArrayType, TimestampType
 from datetime import datetime
 
+quantiles = [0.25, 0.50, 0.75, 0.95]
+relds_cols = ['relds_{}'.format(str(x)[2:]) for x in quantiles]
+
 schema = StructType([StructField('probe', StringType(), False), StructField('app_build_id', StringType(), False),
                      StructField('num_profiles', IntegerType(), True),
-                     StructField('num_pings', IntegerType(), True),
-                     StructField('relDS', ArrayType(DoubleType()), False)])
+                     StructField('num_pings', IntegerType(), True)] + 
+                    [StructField(x, DoubleType(), False) for x in relds_cols]
+                   )
 
 @pandas_udf(schema, PandasUDFType.GROUPED_MAP)
 def calculate_quantile(pdf):
-  result_df = pdf[probes].quantile([0.25, 0.50, 0.75, 0.95])
+  result_df = pdf[probes].quantile(quantiles)
   app_build_id = pdf.app_build_id.iloc[0]  
   app_build_df = build_stats[build_stats.app_build_id==app_build_id]
   num_profiles = app_build_df.num_profiles.iloc[0]
   num_pings = app_build_df.build_pings.iloc[0]
-  final_df = pd.DataFrame([{'probe':x, 'app_build_id': app_build_id, 'num_profiles': num_profiles, 'num_pings': num_pings,                        
-                        'relDS':result_df[x].tolist()} for x in probes])
-  return final_df[['probe', 'app_build_id', 'num_profiles', 'num_pings', 'relDS']]
+  results = []
+  for probe in probes:
+    result = {'probe':probe, 'app_build_id': app_build_id, 'num_profiles': num_profiles, 'num_pings': num_pings}
+    result.update({relds_cols[i]: result_df[probe][x] for i,x in enumerate(quantiles)})
+    results.append(result)
+  final_df = pd.DataFrame(results)
+  return final_df[['probe', 'app_build_id', 'num_profiles', 'num_pings'] + relds_cols]
 
 relds = final.groupby('app_build_id').apply(calculate_quantile)
 relds = relds.withColumn('creation_date', lit(now))
@@ -310,12 +318,8 @@ relds = relds.withColumn('creation_date', lit(now))
 # COMMAND ----------
 
 data_bucket = "telemetry-parquet"
-s3path = "cdowhygelund/CRF/V0_2/relds"
+s3path = "cdowhygelund/CRF/V0_3/relds"
 
 output_file = 's3://{}/{}'.format(data_bucket, s3path)
 
 relds.write.parquet(output_file, mode='append')
-
-# COMMAND ----------
-
-relds.collect()
