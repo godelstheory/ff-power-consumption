@@ -16,8 +16,10 @@ class PerformanceCounterConnector(NameMixin):
         self.client = Marionette('localhost', port=2828)
         self.client.start_session()
         self.counters = []
+        self.script_generator = kwargs.get('script_generator', self.generate_counter_script)
 
-    def generate_counter_script(self):
+    @staticmethod
+    def generate_counter_script():
         script = """
           async function promiseSnapshot() {
             let counters = await ChromeUtils.requestPerformanceMetrics();
@@ -76,7 +78,6 @@ class PerformanceCounterTask(PerformanceCounterConnector):
         thread.start()
 
     def run(self):
-        """ Method that runs forever """
         while True:
             logger.debug('{}: grabbing performance counters'.format(self.name))
             self.append_counters()

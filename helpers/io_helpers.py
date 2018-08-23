@@ -1,5 +1,6 @@
 import logging
 import cPickle
+from text_helpers import always_str
 
 logger = logging.getLogger(__name__)
 
@@ -24,3 +25,13 @@ def unpickle_object(file_path):
 def pickle_object(obj, file_path):
     with open(file_path, 'wb') as f:
         cPickle.dump(obj, f)
+
+
+def get_usr_input(msg, err, validator):
+        res = None
+        while res is None:
+            res = raw_input(always_str(msg) + ': ')
+            if not validator(res):
+                print always_str(err)
+                res = None
+        return res
