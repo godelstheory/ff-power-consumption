@@ -1,11 +1,13 @@
+import json
 import logging
 import threading
 import time
+from os import path
 
 from marionette_driver.marionette import Marionette
 
 from mixins import NameMixin
-from helpers.io_helpers import write_txt_file, pickle_object
+from helpers.io_helpers import write_txt_file, pickle_object, read_txt_file
 
 logger = logging.getLogger(__name__)
 
@@ -20,37 +22,7 @@ class PerformanceCounterConnector(NameMixin):
 
     @staticmethod
     def generate_counter_script():
-        script = """
-          async function promiseSnapshot() {
-            let counters = await ChromeUtils.requestPerformanceMetrics();
-            let tabs = {};
-            for (let counter of counters) {
-              let {items, host, windowId, duration, isWorker, isTopLevel} = counter;
-              // If a worker has a windowId of 0 or max uint64, attach it to the
-              // browser UI (doc group with id 1).
-              if (isWorker && (windowId == 18446744073709552000 || !windowId))
-                windowId = 1;
-              let dispatchCount = 0;
-              for (let {count} of items) {
-                dispatchCount += count;
-              }
-              let tab;
-              if (windowId in tabs) {
-                tab = tabs[windowId];
-              } else {
-                tab = {windowId, host, dispatchCount: 0, duration: 0, children: []};
-                tabs[windowId] = tab;
-              }
-              tab.dispatchCount += dispatchCount;
-              tab.duration += duration;
-              if (!isTopLevel) {
-                tab.children.push({host, isWorker, dispatchCount, duration});
-              }
-            }
-            return {tabs, date: Cu.now()};
-          }
-          return promiseSnapshot();
-        """
+        script = read_txt_file(path.join(path.dirname(__file__), 'retrieve_performance_counters.js'))
         return script
 
     def get_counters(self, script=None):
@@ -63,14 +35,12 @@ class PerformanceCounterConnector(NameMixin):
         self.counters.append(self.get_counters(script=script))
 
     def dump_counters(self, file_path):
-        raise NotImplementedError('Need to massage counters list into a csv file format or DB connection')
-        # counters = self.get_counters()
-        # write_txt_file(file_path, counters)
+        with open(file_path, 'w') as f:
+            json.dump(self.counters, f, indent=4, sort_keys=True)
 
 
 class PerformanceCounterTask(PerformanceCounterConnector):
     def __init__(self, interval=1, **kwargs):
-
         super(PerformanceCounterTask, self).__init__(**kwargs)
         self.interval = interval
         thread = threading.Thread(target=self.run, args=())
@@ -82,5 +52,3 @@ class PerformanceCounterTask(PerformanceCounterConnector):
             logger.debug('{}: grabbing performance counters'.format(self.name))
             self.append_counters()
             time.sleep(self.interval)
-
-

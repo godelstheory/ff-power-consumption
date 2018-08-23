@@ -32,7 +32,7 @@ class Experiment(NameMixin):
 
     @property
     def perf_counter_file_path(self):
-        return '{}_{}_perf_counters.csv'.format(self.exp_name, self.exp_id)
+        return '{}_{}_perf_counters.json'.format(self.exp_name, self.exp_id)
 
     @perf_counter_file_path.setter
     def perf_counter_file_path(self, _):
