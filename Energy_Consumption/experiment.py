@@ -4,6 +4,7 @@ from performance_counter import PerformanceCounterTask
 from datetime import datetime
 from marionette_driver.marionette import Marionette
 import abc
+import csv
 
 
 class Experiment(NameMixin):
@@ -95,20 +96,26 @@ class Experiment(NameMixin):
         # calculate necessary time frame of reference syncs
         # self.calculate_syncs()
         # begin the experiment
-        self.results.append((datetime.now, '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)))
+        self.results.append((datetime.now(), '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)))
         # perform experiment
         self.perform_experiment(**kwargs)
         # serialize performance counters
         counter.dump_counters(self.perf_counter_file_path)
         # end experiment
-        self.results.append((datetime.now, '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)))
-        # serialize experiment
+        self.finalize()
 
     def perform_experiment(self, **kwargs):
         self.results.extend(self.tasks.run(**kwargs))
 
-    def serialize_experiment(self):
-        raise NotImplementedError('{}: serialize_experiment to be determined!'.format(self.name))
+    def serialize(self):
+        with open(self.experiment_file_path, 'wb') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',')
+            for result in self.results:
+                writer.writerow(list(result))
+
+    def finalize(self):
+        self.results.append((datetime.now(), '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)))
+        self.serialize()
 
 
 class Tasks(NameMixin):
