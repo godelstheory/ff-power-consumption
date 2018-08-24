@@ -5,6 +5,10 @@ from datetime import datetime
 from marionette_driver.marionette import Marionette
 import abc
 import csv
+import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Experiment(NameMixin):
@@ -14,12 +18,22 @@ class Experiment(NameMixin):
 
     COUNTER_CLASS = PerformanceCounterTask
 
-    def __init__(self, exp_id, exp_name, tasks):
+    def __init__(self, exp_id, exp_name, tasks, **kwargs):
         self.exp_id = exp_id
         self.exp_name = exp_name
         self.__perf_counters = None
         self.__results = []
         self.__tasks = tasks
+        self.__ff_process = None
+        self.__ff_exe_path = kwargs.get('ff_exe_path', '/Applications/Firefox Nightly.app/Contents/MacOS/firefox')
+
+    @property
+    def ff_exe_path(self):
+        return self.__ff_exe_path
+
+    @ff_exe_path.setter
+    def ff_exe_path(self, _):
+        raise AttributeError('{}: ff_exe_path cannot be manually set'.format(self.name))
 
     @property
     def perf_counters(self):
@@ -63,6 +77,14 @@ class Experiment(NameMixin):
     def tasks(self, value):
         raise AttributeError('{}: tasks cannot be manually set'.format(self.name))
 
+    @property
+    def ff_process(self):
+        return self.__ff_process
+
+    @ff_process.setter
+    def ff_process(self, _):
+        raise AttributeError('{}: ff_process cannot be manually set'.format(self.name))
+
     @staticmethod
     def validate_usr_input(text):
         status = True
@@ -84,23 +106,36 @@ class Experiment(NameMixin):
             msg = 'Please start Windows Performance Manager'
         get_usr_input(msg, err, self.validate_usr_input)
 
-    def run(self, **kwargs):
-        # prompt user: begin FF in Marionette mode
-        self.query_usr(how='FF')
+    @staticmethod
+    def start_client():
+        client = Marionette('localhost', port=2828)
+        client.start_session()
+        return client
+
+    def initialize(self):
+        logger.debug('{}: initializing experiment'.format(self.name))
+        # start Firefox in Marionette mode subprocess
+        self.__ff_process = subprocess.Popen(['{}'.format(self.ff_exe_path), '--marionette'])
+        # Initialize client on tasks
+        self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting counters
-        counter = self.perf_counters
+        _ = self.perf_counters
+        # log the experiment start
+        self.results.append((datetime.now(), '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)))
+
+    def run(self, **kwargs):
+        # begin experiment: start Firefox and logging performance counters
+        self.initialize()
         # prompt user: start Hobo Logger
         self.query_usr(how='Hobo')
         # prompt user: Windows Performance Manager
         self.query_usr(how='WPM')
         # calculate necessary time frame of reference syncs
         # self.calculate_syncs()
-        # begin the experiment
-        self.results.append((datetime.now(), '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)))
         # perform experiment
         self.perform_experiment(**kwargs)
         # serialize performance counters
-        counter.dump_counters(self.perf_counter_file_path)
+        self.perf_counters.dump_counters(self.perf_counter_file_path)
         # end experiment
         self.finalize()
 
@@ -114,8 +149,11 @@ class Experiment(NameMixin):
                 writer.writerow(list(result))
 
     def finalize(self):
+        # save the experiment log
         self.results.append((datetime.now(), '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)))
         self.serialize()
+        # kill the Firefox subprocess
+        self.__ff_process.terminate()
 
 
 class Tasks(NameMixin):
@@ -125,16 +163,17 @@ class Tasks(NameMixin):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):
-        self.__client = Marionette('localhost', port=2828)
-        self.__client.start_session()
+        self.__client = None
+        # self.__client = Marionette('localhost', port=2828)
+        # self.__client.start_session()
 
     @property
     def client(self):
         return self.__client
 
     @client.setter
-    def client(self, _):
-        raise AttributeError('{}: client cannot be manually set'.format(self.name))
+    def client(self, value):
+        self.__client = value
 
     @abc.abstractproperty
     def tasks(self):
