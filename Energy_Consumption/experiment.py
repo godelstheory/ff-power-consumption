@@ -134,8 +134,6 @@ class Experiment(NameMixin):
         # self.calculate_syncs()
         # perform experiment
         self.perform_experiment(**kwargs)
-        # serialize performance counters
-        self.perf_counters.dump_counters(self.perf_counter_file_path)
         # end experiment
         self.finalize()
 
@@ -149,6 +147,8 @@ class Experiment(NameMixin):
                 writer.writerow(list(result))
 
     def finalize(self):
+        # serialize performance counters
+        self.perf_counters.dump_counters(self.perf_counter_file_path)
         # save the experiment log
         self.results.append((datetime.now(), '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)))
         self.serialize()
