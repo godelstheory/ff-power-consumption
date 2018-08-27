@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from datetime import datetime
 from os import path
 
 from marionette_driver.marionette import Marionette
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class PerformanceCounterConnector(NameMixin):
+    TIMESTAMP_FMT = '%Y%m%d_%H%M%S'
+
     def __init__(self, **kwargs):
         logger.info('{}: connecting to Marionette and beginning session')
         self.client = Marionette('localhost', port=2828)
@@ -28,7 +31,8 @@ class PerformanceCounterConnector(NameMixin):
     def get_counters(self, script=None):
         with self.client.using_context(self.client.CONTEXT_CHROME):
             script = script if script is not None else self.generate_counter_script()
-            counters = self.client.execute_script(script)
+            counters = {'tabs': self.client.execute_script(script),
+                        'timestamp': datetime.now().strftime(self.TIMESTAMP_FMT)}
         return counters
 
     def append_counters(self, script=None):

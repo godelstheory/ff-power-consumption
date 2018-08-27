@@ -24,6 +24,6 @@ async function promiseSnapshot() {
         tab.children.push({host, isWorker, dispatchCount, duration});
       }
     }
-    return {tabs, date: Cu.now()};
+    return tabs;
 }
 return promiseSnapshot();

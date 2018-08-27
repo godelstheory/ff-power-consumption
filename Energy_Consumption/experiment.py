@@ -19,8 +19,6 @@ class ExperimentMeta(NameMixin):
         self.exp_id = exp_id
         self.exp_name = exp_name
         self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
-        # ensure the experiment results directory exists and is cleaned out
-        make_dir(self.__exp_dir_path, clear=True)
 
     @property
     def exp_dir_path(self):
@@ -61,6 +59,8 @@ class Experiment(ExperimentMeta):
         self.__tasks = tasks
         self.__ff_process = None
         self.__ff_exe_path = kwargs.get('ff_exe_path', '/Applications/Firefox Nightly.app/Contents/MacOS/firefox')
+        # ensure the experiment results directory exists and is cleaned out
+        make_dir(self.exp_dir_path, clear=True)
 
     @property
     def ff_exe_path(self):
