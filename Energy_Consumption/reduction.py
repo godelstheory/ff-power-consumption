@@ -2,6 +2,7 @@ import abc
 import csv
 import json
 from datetime import datetime
+
 import pandas as pd
 
 from experiment import ExperimentMeta
@@ -38,16 +39,34 @@ class ExperimentReducer(ExperimentMeta):
         for x in results:
             x['timestamp'] = datetime.strptime(x['timestamp'], perf.TIMESTAMP_FMT)
         raw_df = pd.DataFrame(results)
-
-        return raw_df
+        reduce_df = self.reduce_perf_counters(raw_df)
+        return {'raw': raw_df, 'reduced': reduce_df}
 
     @abc.abstractmethod
-    def reduce_perf_counters(self):
+    def reduce_perf_counters(self, raw_df):
         """
-        Method to reduce by tab and nested data structure into a vector of values per timestamp. 
+        Method to reduce by tab and nested data structure into a vector of values per timestamp.
         """
         pass
 
 
+def agg_top(x):
+    """
+    Adds up all of the dispatchCount and duration values for each "tab". Ignores children.
+    :param x:
+    :return:
+    """
+    duration = 0
+    dispatch_count = 0
+    num_windows = len(x)
+    for win_id, results in x.iteritems():
+        duration += results['duration']
+        dispatch_count += results['dispatchCount']
+    return pd.Series({'duration': duration, 'dispatch_count': dispatch_count, 'num_windows': num_windows})
 
 
+class AggExperimentReducer(ExperimentReducer):
+    def reduce_perf_counters(self, raw_df):
+        reduce_df = raw_df.tabs.apply(agg_top)
+        reduce_df['timestamp'] = raw_df['timestamp']
+        return reduce_df
