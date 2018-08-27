@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class PerformanceCounterConnector(NameMixin):
-    TIMESTAMP_FMT = '%Y%m%d_%H%M%S'
+    TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, **kwargs):
         logger.info('{}: connecting to Marionette and beginning session')

@@ -28,8 +28,8 @@ class ExperimentReducer(ExperimentMeta):
         with open(exp_file_path) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             for row in csv_reader:
-                results.append({'timestamp': row[0], 'action': row[1]})
-        return pd.DataFrame(results)
+                results.append({'timestamp': datetime.strptime(row[0], perf.TIMESTAMP_FMT), 'action': row[1]})
+        return pd.DataFrame(results).sort_values('timestamp')
 
     def parse_perf(self, **kwargs):
         perf_counter_file_path = kwargs.get('perf_counter_file_path', self.perf_counter_file_path)
@@ -39,8 +39,24 @@ class ExperimentReducer(ExperimentMeta):
         for x in results:
             x['timestamp'] = datetime.strptime(x['timestamp'], perf.TIMESTAMP_FMT)
         raw_df = pd.DataFrame(results)
-        reduce_df = self.reduce_perf_counters(raw_df)
+        reduce_df = self.reduce_perf_counters(raw_df).sort_values('timestamp')
         return {'raw': raw_df, 'reduced': reduce_df}
+
+    def merge(self, exp_df, counters_df, **kwargs):
+        results_df = counters_df.copy()
+
+        def get_action(timestamp):
+            action = exp_df.action[exp_df.timestamp >= timestamp].iloc[0]
+            return action
+
+        results_df['action'] = results_df.timestamp.apply(get_action)
+        return results_df
+
+    def run(self, **kwargs):
+        exp_results = self.parse_exp(**kwargs)
+        perf_results = self.parse_perf(**kwargs)['reduced']
+        final = self.merge(exp_results, perf_results, **kwargs)
+        return final
 
     @abc.abstractmethod
     def reduce_perf_counters(self, raw_df):
