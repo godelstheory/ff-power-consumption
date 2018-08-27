@@ -1,17 +1,53 @@
-from mixins import NameMixin
-from helpers.io_helpers import get_usr_input
-from performance_counter import PerformanceCounterTask
-from datetime import datetime
-from marionette_driver.marionette import Marionette
 import abc
 import csv
-import subprocess
 import logging
+import subprocess
+from datetime import datetime
+from os import path, getcwd
+
+from marionette_driver.marionette import Marionette
+
+from helpers.io_helpers import get_usr_input, make_dir
+from mixins import NameMixin
+from performance_counter import PerformanceCounterTask
 
 logger = logging.getLogger(__name__)
 
 
-class Experiment(NameMixin):
+class ExperimentMeta(NameMixin):
+    def __init__(self, exp_id, exp_name, **kwargs):
+        self.exp_id = exp_id
+        self.exp_name = exp_name
+        self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
+        # ensure the experiment results directory exists and is cleaned out
+        make_dir(self.__exp_dir_path, clear=True)
+
+    @property
+    def exp_dir_path(self):
+        return self.__exp_dir_path
+
+    @exp_dir_path.setter
+    def exp_dir_path(self, _):
+        raise AttributeError('{}: exp_dir_path cannot be manually set'.format(self.name))
+
+    @property
+    def perf_counter_file_path(self):
+        return path.join(self.__exp_dir_path, '{}_{}_perf_counters.json'.format(self.exp_name, self.exp_id))
+
+    @perf_counter_file_path.setter
+    def perf_counter_file_path(self, _):
+        raise AttributeError('{}: perf_counter_file_path cannot be manually set'.format(self.name))
+
+    @property
+    def experiment_file_path(self):
+        return path.join(self.exp_dir_path, '{}_{}_experiment.csv'.format(self.exp_name, self.exp_id))
+
+    @experiment_file_path.setter
+    def experiment_file_path(self, _):
+        raise AttributeError('{}: experiment_file_path cannot be manually set'.format(self.name))
+
+
+class Experiment(ExperimentMeta):
     """
     Runs the experiment: fires up performance counters, ensures all data logging pieces in place, fires off Marionette tasks
     """
@@ -19,8 +55,7 @@ class Experiment(NameMixin):
     COUNTER_CLASS = PerformanceCounterTask
 
     def __init__(self, exp_id, exp_name, tasks, **kwargs):
-        self.exp_id = exp_id
-        self.exp_name = exp_name
+        super(Experiment, self).__init__(exp_id, exp_name, **kwargs)
         self.__perf_counters = None
         self.__results = []
         self.__tasks = tasks
@@ -44,22 +79,6 @@ class Experiment(NameMixin):
     @perf_counters.setter
     def perf_counters(self, value):
         raise AttributeError('{}: perf_counters cannot be manually set'.format(self.name))
-
-    @property
-    def perf_counter_file_path(self):
-        return '{}_{}_perf_counters.json'.format(self.exp_name, self.exp_id)
-
-    @perf_counter_file_path.setter
-    def perf_counter_file_path(self, _):
-        raise AttributeError('{}: perf_counter_file_path cannot be manually set'.format(self.name))
-
-    @property
-    def experiment_file_path(self):
-        return '{}_{}_experiment.csv'.format(self.exp_name, self.exp_id)
-
-    @experiment_file_path.setter
-    def experiment_file_path(self, _):
-        raise AttributeError('{}: experiment_file_path cannot be manually set'.format(self.name))
 
     @property
     def results(self):
@@ -141,8 +160,8 @@ class Experiment(NameMixin):
         self.results.extend(self.tasks.run(**kwargs))
 
     def serialize(self):
-        with open(self.experiment_file_path, 'wb') as csvfile:
-            writer = csv.writer(csvfile, delimiter=',')
+        with open(self.experiment_file_path, 'wb') as csv_file:
+            writer = csv.writer(csv_file, delimiter=',')
             for result in self.results:
                 writer.writerow(list(result))
 

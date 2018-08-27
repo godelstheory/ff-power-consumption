@@ -6,8 +6,8 @@ from os import path
 
 from marionette_driver.marionette import Marionette
 
+from helpers.io_helpers import read_txt_file
 from mixins import NameMixin
-from helpers.io_helpers import write_txt_file, pickle_object, read_txt_file
 
 logger = logging.getLogger(__name__)
 

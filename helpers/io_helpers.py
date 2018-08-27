@@ -1,5 +1,7 @@
-import logging
 import cPickle
+import logging
+from os import path, makedirs, listdir, remove
+
 from text_helpers import always_str
 
 logger = logging.getLogger(__name__)
@@ -35,3 +37,11 @@ def get_usr_input(msg, err, validator):
                 print always_str(err)
                 res = None
         return res
+
+
+def make_dir(dir_path, clear=False):
+    if not path.isdir(dir_path):
+        makedirs(dir_path)
+    elif clear:
+        for file_name in listdir(dir_path):
+            remove(path.join(dir_path, file_name))
