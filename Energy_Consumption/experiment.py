@@ -2,6 +2,7 @@ import abc
 import csv
 import logging
 import subprocess
+import sys
 from datetime import datetime
 from os import path, getcwd
 
@@ -58,9 +59,19 @@ class Experiment(ExperimentMeta):
         self.__results = []
         self.__tasks = tasks
         self.__ff_process = None
-        self.__ff_exe_path = kwargs.get('ff_exe_path', '/Applications/Firefox Nightly.app/Contents/MacOS/firefox')
+        self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
         # ensure the experiment results directory exists and is cleaned out
         make_dir(self.exp_dir_path, clear=True)
+
+    def get_ff_default_path(self):
+        platform = sys.platform.lower()
+        if platform == 'darwin':
+            ff_exe_path = '/Applications/Firefox Nightly.app/Contents/MacOS/firefox'
+        elif platform == 'win32':
+            ff_exe_path = 'C:/Program Files/Firefox Nightly/firefox.exe'
+        else:
+            raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
+        return ff_exe_path
 
     @property
     def ff_exe_path(self):
