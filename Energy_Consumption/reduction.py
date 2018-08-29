@@ -41,6 +41,10 @@ class ExperimentReducer(ExperimentMeta):
             x['timestamp'] = datetime.strptime(x['timestamp'], perf.TIMESTAMP_FMT)
         raw_df = pd.DataFrame(results)
         reduce_df = self.reduce_perf_counters(raw_df).sort_values('timestamp')
+        # make timestamp index
+        reduce_df = reduce_df.set_index(pd.DatetimeIndex(reduce_df.timestamp)).drop('timestamp', axis=1)
+        # upsample to 1s grid
+        reduce_df = reduce_df.resample('s').ffill(limit=1).interpolate().dropna()
         return {'raw': raw_df, 'reduced': reduce_df}
 
     def parse_hobo(self, **kwargs):
@@ -69,19 +73,27 @@ class ExperimentReducer(ExperimentMeta):
         # TODO: Not implemented
 
     def merge_counters(self, exp_df, counters_df, **kwargs):
-        # merge: Add experiment action to counters data frame
+        """
+        Merges Marionette actions and Hobo sync to performance counters data frame
+
+        :param exp_df:
+        :param counters_df:
+        :param kwargs:
+        :return:
+        """
         results_df = counters_df.copy()
 
         def get_action(timestamp):
             action = exp_df.action[exp_df.timestamp <= timestamp].iloc[-1]
             return action
 
-        results_df['action'] = results_df.timestamp.apply(get_action)
+        timestamps = results_df.index.to_series()
+        results_df['action'] = timestamps.apply(get_action)
 
         if self.hobo_sync_log_tag not in results_df.action:
             sync_ts = exp_df.timestamp[exp_df.action == self.hobo_sync_log_tag].iloc[0]
             # find the closest timestamp
-            results_df.action[(results_df.timestamp - sync_ts).abs().idxmin()] = self.hobo_sync_log_tag
+            results_df.action[(timestamps - sync_ts).abs().idxmin()] = self.hobo_sync_log_tag
 
         return results_df
 
