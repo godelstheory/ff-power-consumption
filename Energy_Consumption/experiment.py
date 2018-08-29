@@ -122,10 +122,17 @@ class Experiment(ExperimentMeta):
             status = False
         return status
 
-    def calculate_syncs(self, **kwargs):
-        raise NotImplementedError('{}: calculate_syncs to be determined!'.format(self.name))
+    def log_sync(self, **kwargs):
+        synced = False
+        while not synced:
+            # query usr to press Hobo log button and return at similar times
+            msg = 'Sync in process: press Hobo log button and enter on keyboard at same time'
+            get_usr_input(msg, None, lambda x: True)
+            self.results.append((datetime.now(), 'hobo_sync_marker'))
+            synced = True  # TODO: Address ability to sync again if necessary
 
     def query_usr(self, how):
+        # TODO: Refactor to support log_sync, remove other how options other than Hobo
         err = 'Once started, please say "Y"'
         msg = 'Unhandled incorrect input'
         if how == 'FF':
@@ -159,9 +166,9 @@ class Experiment(ExperimentMeta):
         # prompt user: start Hobo Logger
         self.query_usr(how='Hobo')
         # prompt user: Windows Performance Manager
-        self.query_usr(how='WPM')
+        # self.query_usr(how='WPM')
         # calculate necessary time frame of reference syncs
-        # self.calculate_syncs()
+        self.log_sync()
         # perform experiment
         self.perform_experiment(**kwargs)
         # end experiment
