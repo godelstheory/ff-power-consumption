@@ -20,6 +20,17 @@ class ExperimentReducer(ExperimentMeta):
 
     __metaclass__ = abc.ABCMeta
 
+    @property
+    def hobo_columns(self):
+        return ['timestamp', 'rms_voltage', 'rms_current', 'active_pwr', 'active_energy',
+                                             'apparent_pwr', 'power_factor', 'started', 'btn_up', 'btn_dwn', 'stopped',
+                                             'end']
+
+    @property
+    def hobo_data_columns(self):
+        return ['rms_voltage', 'rms_current', 'active_pwr', 'active_energy', 'apparent_pwr',
+                'power_factor']
+
     def __init__(self, exp_id, exp_name, **kwargs):
         super(ExperimentReducer, self).__init__(exp_id, exp_name, **kwargs)
 
@@ -48,9 +59,7 @@ class ExperimentReducer(ExperimentMeta):
         return {'raw': raw_df, 'reduced': reduce_df}
 
     def parse_hobo(self, **kwargs):
-        col_names = kwargs.get('col_names', ['timestamp', 'rms_voltage', 'rms_current', 'active_pwr', 'active_energy',
-                                             'apparent_pwr', 'power_factor', 'started', 'btn_up', 'btn_dwn', 'stopped',
-                                             'end'])
+        col_names = kwargs.get('col_names', self.hobo_columns)
         hobo_file_path = kwargs.get('hobo_file_path',
                                     path.join(self.exp_dir_path, 'exp_{}_hobo.csv'.format(self.exp_id)))
 
@@ -58,19 +67,24 @@ class ExperimentReducer(ExperimentMeta):
         if '#' in hobo_df:
             hobo_df = hobo_df.drop('#', axis=1)
         hobo_df.columns = col_names
+        # hobo_df = hobo_df.set_index(pd.DatetimeIndex(hobo_df.timestamp)).drop('timestamp', axis=1)
         return hobo_df
 
     def merge(self, exp_df, counters_df, hobo_df, **kwargs):
         # merge: Perf counter to experiment
         results_df = self.merge_counters(exp_df, counters_df, **kwargs)
         # merge: Hobo logger to counters
-        self.merge_hobo(results_df, hobo_df, **kwargs)
-        return results_df
+        full_df = self.merge_hobo(results_df, hobo_df, **kwargs)
+        return full_df
 
     def merge_hobo(self, results_df, hobo_df, **kwargs):
         # find sync timestamp in both data frames
-        hobo_sync = hobo_df.loc[~hobo_df.btn_dwn.isna(), ['timestamp', 'btn_dwn']].iloc[0]
-        # TODO: Not implemented
+        hobo_sync = hobo_df.loc[~hobo_df.btn_dwn.isna(), 'timestamp'].iloc[0]
+        exp_sync = results_df.index.to_series()[results_df.action==self.hobo_sync_log_tag].iloc[0]
+        new_timestamp = hobo_df.timestamp+(exp_sync-hobo_sync)
+        hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp)).drop('timestamp', axis=1)
+        full_df = results_df.join(hobo_df[self.hobo_data_columns], how='inner')
+        return full_df
 
     def merge_counters(self, exp_df, counters_df, **kwargs):
         """
