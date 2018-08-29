@@ -45,6 +45,14 @@ class ExperimentMeta(NameMixin):
     def experiment_file_path(self, _):
         raise AttributeError('{}: experiment_file_path cannot be manually set'.format(self.name))
 
+    @property
+    def hobo_sync_log_tag(self):
+        return 'hobo_sync_marker'
+
+    @hobo_sync_log_tag.setter
+    def hobo_sync_log_tag(self, _):
+        raise AttributeError('{}: hobo_sync_log_tag cannot be manually set'.format(self.name))
+
 
 class Experiment(ExperimentMeta):
     """
@@ -128,7 +136,7 @@ class Experiment(ExperimentMeta):
             # query usr to press Hobo log button and return at similar times
             msg = 'Sync in process: press Hobo log button and enter on keyboard at same time'
             get_usr_input(msg, None, lambda x: True)
-            self.results.append((datetime.now(), 'hobo_sync_marker'))
+            self.results.append((datetime.now(), self.hobo_sync_log_tag))
             synced = True  # TODO: Address ability to sync again if necessary
 
     def query_usr(self, how):
