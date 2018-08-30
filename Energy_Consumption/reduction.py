@@ -26,10 +26,18 @@ class ExperimentReducer(ExperimentMeta):
                                              'apparent_pwr', 'power_factor', 'started', 'btn_up', 'btn_dwn', 'stopped',
                                              'end']
 
+    @hobo_columns.setter
+    def hobo_columns(self, _):
+        raise AttributeError('{}: hobo_columns cannot be manually set'.format(self.name))
+
     @property
     def hobo_data_columns(self):
         return ['rms_voltage', 'rms_current', 'active_pwr', 'active_energy', 'apparent_pwr',
                 'power_factor']
+
+    @hobo_data_columns.setter
+    def hobo_columns(self, _):
+        raise AttributeError('{}: hobo_data_columns cannot be manually set'.format(self.name))
 
     def __init__(self, exp_id, exp_name, **kwargs):
         super(ExperimentReducer, self).__init__(exp_id, exp_name, **kwargs)
@@ -78,11 +86,14 @@ class ExperimentReducer(ExperimentMeta):
         return full_df
 
     def merge_hobo(self, results_df, hobo_df, **kwargs):
-        # find sync timestamp in both data frames
-        hobo_sync = hobo_df.loc[~hobo_df.btn_dwn.isna(), 'timestamp'].iloc[0]
-        exp_sync = results_df.index.to_series()[results_df.action==self.hobo_sync_log_tag].iloc[0]
-        new_timestamp = hobo_df.timestamp+(exp_sync-hobo_sync)
-        hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp)).drop('timestamp', axis=1)
+        apply_sync_offset = kwargs.get('apply_sync_offset', False)
+        if apply_sync_offset:
+            # find sync timestamp in both data frames
+            hobo_sync = hobo_df.loc[~hobo_df.btn_dwn.isna(), 'timestamp'].iloc[0]
+            exp_sync = results_df.index.to_series()[results_df.action==self.hobo_sync_log_tag].iloc[0]
+            new_timestamp = hobo_df.timestamp+(exp_sync-hobo_sync)
+            hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp))
+        hobo_df = hobo_df.drop('timestamp', axis=1)
         full_df = results_df.join(hobo_df[self.hobo_data_columns], how='inner')
         return full_df
 
