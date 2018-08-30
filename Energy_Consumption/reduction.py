@@ -23,8 +23,8 @@ class ExperimentReducer(ExperimentMeta):
     @property
     def hobo_columns(self):
         return ['timestamp', 'rms_voltage', 'rms_current', 'active_pwr', 'active_energy',
-                                             'apparent_pwr', 'power_factor', 'started', 'btn_up', 'btn_dwn', 'stopped',
-                                             'end']
+                'apparent_pwr', 'power_factor', 'started', 'btn_up', 'btn_dwn', 'stopped',
+                'end']
 
     @hobo_columns.setter
     def hobo_columns(self, _):
@@ -90,8 +90,8 @@ class ExperimentReducer(ExperimentMeta):
         if apply_sync_offset:
             # find sync timestamp in both data frames
             hobo_sync = hobo_df.loc[~hobo_df.btn_dwn.isna(), 'timestamp'].iloc[0]
-            exp_sync = results_df.index.to_series()[results_df.action==self.hobo_sync_log_tag].iloc[0]
-            new_timestamp = hobo_df.timestamp+(exp_sync-hobo_sync)
+            exp_sync = results_df.index.to_series()[results_df.action == self.hobo_sync_log_tag].iloc[0]
+            new_timestamp = hobo_df.timestamp + (exp_sync - hobo_sync)
             hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp))
         hobo_df = hobo_df.drop('timestamp', axis=1)
         full_df = results_df.join(hobo_df[self.hobo_data_columns], how='inner')
