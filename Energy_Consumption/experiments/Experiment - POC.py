@@ -1,9 +1,7 @@
+from os import path
 from Energy_Consumption.experiment import Experiment, Tasks, Task
 
-task_1 = """self.client.navigate('http://mozilla.org')
-        self.client.go_back()
-        self.client.go_forward()
-        """
+exp_id = 0
 
 
 class TasksTest(Tasks):
@@ -17,6 +15,7 @@ class TasksTest(Tasks):
         return tasks
 
 
-exp = Experiment(exp_id=0, exp_name='Test Experiment', tasks=TasksTest())
+exp_name = path.splitext(path.basename(__file__))[0]
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
 
 exp.run()

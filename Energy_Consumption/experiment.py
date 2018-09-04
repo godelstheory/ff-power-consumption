@@ -1,10 +1,9 @@
 import abc
-import csv
 import json
 import logging
 import subprocess
 import sys
-from datetime import datetime
+import time
 from os import path, getcwd
 
 from marionette_driver.marionette import Marionette
@@ -19,8 +18,16 @@ logger = logging.getLogger(__name__)
 class ExperimentMeta(NameMixin):
     def __init__(self, exp_id, exp_name, **kwargs):
         self.exp_id = exp_id
-        self.exp_name = exp_name
+        self.__exp_name = exp_name
         self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
+
+    @property
+    def exp_name(self):
+        return self.__exp_name
+
+    @exp_name.setter
+    def exp_name(self, _):
+        raise AttributeError('{}: exp_name cannot be manually set'.format(self.name))
 
     @property
     def exp_dir_path(self):
