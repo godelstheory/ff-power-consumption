@@ -1,5 +1,6 @@
 import abc
 import csv
+import json
 import logging
 import subprocess
 import sys
@@ -10,7 +11,7 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from performance_counter import PerformanceCounterTask
+from performance_counter import PerformanceCounterTask, get_now
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class ExperimentMeta(NameMixin):
 
     @property
     def experiment_file_path(self):
-        return path.join(self.exp_dir_path, '{}_{}_experiment.csv'.format(self.exp_name, self.exp_id))
+        return path.join(self.exp_dir_path, '{}_{}_experiment.json'.format(self.exp_name, self.exp_id))
 
     @experiment_file_path.setter
     def experiment_file_path(self, _):
@@ -136,7 +137,7 @@ class Experiment(ExperimentMeta):
             # query usr to press Hobo log button and return at similar times
             msg = 'Sync in process: press Hobo log button and enter on keyboard at same time'
             get_usr_input(msg, None, lambda x: True)
-            self.results.append((datetime.now(), self.hobo_sync_log_tag))
+            self.results.append({'timestamp': get_now(), 'action': self.hobo_sync_log_tag})
             synced = True  # TODO: Address ability to sync again if necessary
 
     def query_usr(self, how):
@@ -166,7 +167,8 @@ class Experiment(ExperimentMeta):
         # connect to Firefox, begin collecting counters
         _ = self.perf_counters
         # log the experiment start
-        self.results.append((datetime.now(), '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)))
+        self.results.append({'timestamp': get_now(),
+                             'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
 
     def run(self, **kwargs):
         # begin experiment: start Firefox and logging performance counters
@@ -186,16 +188,19 @@ class Experiment(ExperimentMeta):
         self.results.extend(self.tasks.run(**kwargs))
 
     def serialize(self):
-        with open(self.experiment_file_path, 'wb') as csv_file:
-            writer = csv.writer(csv_file, delimiter=',')
-            for result in self.results:
-                writer.writerow(list(result))
+        with open(self.experiment_file_path, 'wb') as f:
+            json.dump(self.results, f, indent=4, sort_keys=True)
+        # with open(self.experiment_file_path, 'wb') as csv_file:
+        #     writer = csv.writer(csv_file, delimiter=',')
+        #     for result in self.results:
+        #         writer.writerow(list(result))
 
     def finalize(self):
         # serialize performance counters
         self.perf_counters.dump_counters(self.perf_counter_file_path)
         # save the experiment log
-        self.results.append((datetime.now(), '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)))
+        self.results.append({'timestamp': get_now(),
+                             'action': '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)})
         self.serialize()
         # kill the Firefox subprocess
         self.__ff_process.terminate()
@@ -240,9 +245,10 @@ class Task(NameMixin):
     A single Marionette task
     """
 
-    def __init__(self, task, client):
+    def __init__(self, task, client, **kwargs):
         self.__task = task
         self.__client = client
+        self.__meta = kwargs.get('meta', {})
 
     @property
     def client(self):
@@ -251,6 +257,14 @@ class Task(NameMixin):
     @client.setter
     def client(self, _):
         raise AttributeError('{}: client cannot be manually set'.format(self.name))
+
+    @property
+    def meta(self):
+        return self.__meta
+
+    @meta.setter
+    def meta(self, _):
+        raise AttributeError('{}: meta cannot be manually set'.format(self.name))
 
     @property
     def task(self):
@@ -268,7 +282,7 @@ class Task(NameMixin):
 
     def run(self, **kwargs):
         # log the task time
-        result = (datetime.now(), self.task.replace('\n', '\t'))
+        result = {'timestamp': get_now(), 'action': self.task.replace('\n', '\t'), 'meta': self.meta}
         # fire off the task
         for action in self.task.split('\n'):
             eval(action)

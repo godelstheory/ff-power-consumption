@@ -7,7 +7,7 @@ from os import path
 import pandas as pd
 
 from experiment import ExperimentMeta
-from performance_counter import PerformanceCounterConnector as perf
+from performance_counter import PerformanceCounterConnector as perf, TIMESTAMP_FMT
 
 
 class ExperimentReducer(ExperimentMeta):
@@ -43,21 +43,17 @@ class ExperimentReducer(ExperimentMeta):
         super(ExperimentReducer, self).__init__(exp_id, exp_name, **kwargs)
 
     def parse_exp(self, **kwargs):
-        results = []
         exp_file_path = kwargs.get('exp_file_path', self.experiment_file_path)
-        with open(exp_file_path) as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-            for row in csv_reader:
-                results.append({'timestamp': datetime.strptime(row[0], perf.TIMESTAMP_FMT), 'action': row[1]})
-        return pd.DataFrame(results).sort_values('timestamp')
+        return pd.read_json(exp_file_path, convert_dates=True, orient='records').sort_values('timestamp')
 
     def parse_perf(self, **kwargs):
+        # TODO: use pandas.read_json
         perf_counter_file_path = kwargs.get('perf_counter_file_path', self.perf_counter_file_path)
         with open(perf_counter_file_path, 'r') as f:
             results = json.load(f)
         # massage timestamp into DateTime
         for x in results:
-            x['timestamp'] = datetime.strptime(x['timestamp'], perf.TIMESTAMP_FMT)
+            x['timestamp'] = datetime.strptime(x['timestamp'], TIMESTAMP_FMT)
         raw_df = pd.DataFrame(results)
         reduce_df = self.reduce_perf_counters(raw_df).sort_values('timestamp')
         # make timestamp index

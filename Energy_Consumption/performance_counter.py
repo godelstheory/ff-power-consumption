@@ -12,9 +12,14 @@ from mixins import NameMixin
 
 logger = logging.getLogger(__name__)
 
+TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S.%f'
+
+
+def get_now():
+    return datetime.now().strftime(TIMESTAMP_FMT)
+
 
 class PerformanceCounterConnector(NameMixin):
-    TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S.%f'
 
     def __init__(self, **kwargs):
         logger.info('{}: connecting to Marionette and beginning session')
@@ -32,7 +37,7 @@ class PerformanceCounterConnector(NameMixin):
         with self.client.using_context(self.client.CONTEXT_CHROME):
             script = script if script is not None else self.generate_counter_script()
             counters = {'tabs': self.client.execute_script(script),
-                        'timestamp': datetime.now().strftime(self.TIMESTAMP_FMT)}
+                        'timestamp': get_now()}
         return counters
 
     def append_counters(self, script=None):

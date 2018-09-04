@@ -9,7 +9,11 @@ task_1 = """self.client.navigate('http://mozilla.org')
 class TasksTest(Tasks):
     @property
     def tasks(self):
-        tasks = [Task(task_1.strip(), self.client)]
+        tasks = [Task("self.client.navigate('http://mozilla.org')", self.client,
+                      meta={'website': 'http://mozilla.org'}),
+                 Task("self.client.go_back()", self.client, meta={'website': 'HOME'}),
+                 Task("self.client.go_forward()", self.client, meta={'website': 'http://mozilla.org'})
+                 ]
         return tasks
 
 
