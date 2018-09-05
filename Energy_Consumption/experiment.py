@@ -4,6 +4,7 @@ import logging
 import subprocess
 import sys
 import time
+import traceback
 from os import path, getcwd
 
 from marionette_driver.marionette import Marionette
@@ -290,7 +291,12 @@ class Task(NameMixin):
     def run(self, **kwargs):
         # log the task time
         result = {'timestamp': get_now(), 'action': self.task.replace('\n', '\t'), 'meta': self.meta}
-        # fire off the task
-        for action in self.task.split('\n'):
-            eval(action)
+        try:
+            # fire off the task
+            for action in self.task.split('\n'):
+                eval(action)
+        except Exception as e:
+            exp = traceback.format_exc()
+            logger.error('{}: Failed on task\n{}\n{}'.format(self.name, e, exp))
+            result['meta']['error'] = exp
         return result
