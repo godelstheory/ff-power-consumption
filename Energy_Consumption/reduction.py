@@ -36,7 +36,7 @@ class ExperimentReducer(ExperimentMeta):
                 'power_factor']
 
     @hobo_data_columns.setter
-    def hobo_columns(self, _):
+    def hobo_data_columns(self, _):
         raise AttributeError('{}: hobo_data_columns cannot be manually set'.format(self.name))
 
     def __init__(self, exp_id, exp_name, **kwargs):
@@ -89,6 +89,8 @@ class ExperimentReducer(ExperimentMeta):
             exp_sync = results_df.index.to_series()[results_df.action == self.hobo_sync_log_tag].iloc[0]
             new_timestamp = hobo_df.timestamp + (exp_sync - hobo_sync)
             hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp))
+        else:
+            hobo_df = hobo_df.set_index(pd.DatetimeIndex(hobo_df.timestamp))
         hobo_df = hobo_df.drop('timestamp', axis=1)
         full_df = results_df.join(hobo_df[self.hobo_data_columns], how='inner')
         return full_df
