@@ -1,9 +1,20 @@
 from os import path
 
-from Energy_Consumption.reduction import AggExperimentReducer
+from Energy_Consumption.reduction import experiment_reduction as reduce
 
-reducer = AggExperimentReducer(exp_id=1, exp_name='Experiment - EDA')
+
+# Sum all the performance counter tabs
+# reducer = reduce.SumExperimentReducer(exp_id=1, exp_name='Experiment - EDA')
+#
+# df = reducer.run()
+#
+# df.to_csv(path.join(reducer.exp_dir_path, 'df_reduced.csv'))
+
+# Filter all the performance counter tabs to '1'
+reducer = reduce.Filter1ExperimentReducer(exp_id=1, exp_name='Experiment - EDA')
 
 df = reducer.run()
 
-df.to_json(path.join(reducer.exp_dir_path, 'df_reduced.json'))
+df.to_csv(path.join(reducer.exp_dir_path, 'df_filter1_reduced.csv'))
+
+
