@@ -27,18 +27,17 @@ class TasksTest(Tasks):
             Task("self.client.navigate('https://www.twitch.tv')", self.client,
                  meta={'website': 'https://www.twitch.tv'}),
             # wait for 2 minutes
-            Task('time.sleep(120)', self.client, meta={'website': 'HOME'}),
+            Task('time.sleep(120)', self.client, meta={'website': 'https://www.twitch.tv'}),
             # go to Twitch: Fortnite
             Task("self.client.navigate('https://www.twitch.tv/directory/game/Fortnite')", self.client,
                  meta={'website': 'https://www.twitch.tv/directory/game/Fortnite'}),
             # wait for 2 minutes
-            Task('time.sleep(120)', self.client, meta={'website': 'HOME'}),
+            Task('time.sleep(120)', self.client, meta={'website': 'https://www.twitch.tv/directory/game/Fortnite'}),
             # go to Twitch: Fortnite
             Task("self.client.navigate('https://www.twitch.tv/directory/game/Fortnite')", self.client,
                  meta={'website': 'https://www.twitch.tv/directory/game/Fortnite'}),
-
             # wait for 2 minutes
-            Task('time.sleep(120)', self.client, meta={'website': 'HOME'}),
+            Task('time.sleep(120)', self.client, meta={'website': 'https://www.twitch.tv/directory/game/Fortnite'}),
             # go to Firefox Add-ons, back and forward
             Task("self.client.navigate('https://addons.mozilla.org/en-US/firefox/')", self.client,
                  meta={'website': 'https://addons.mozilla.org/en-US/firefox/'}),

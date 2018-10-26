@@ -1,13 +1,13 @@
 import abc
-import csv
 import json
 from datetime import datetime
 from os import path
 
 import pandas as pd
 
-from experiment import ExperimentMeta
-from performance_counter import PerformanceCounterConnector as perf, TIMESTAMP_FMT
+from Energy_Consumption.experiment import ExperimentMeta
+from Energy_Consumption.performance_counter import TIMESTAMP_FMT
+from Energy_Consumption.reduction.performance_reduction import agg_sum, filter_one
 
 
 class ExperimentReducer(ExperimentMeta):
@@ -36,7 +36,7 @@ class ExperimentReducer(ExperimentMeta):
                 'power_factor']
 
     @hobo_data_columns.setter
-    def hobo_columns(self, _):
+    def hobo_data_columns(self, _):
         raise AttributeError('{}: hobo_data_columns cannot be manually set'.format(self.name))
 
     def __init__(self, exp_id, exp_name, **kwargs):
@@ -89,6 +89,8 @@ class ExperimentReducer(ExperimentMeta):
             exp_sync = results_df.index.to_series()[results_df.action == self.hobo_sync_log_tag].iloc[0]
             new_timestamp = hobo_df.timestamp + (exp_sync - hobo_sync)
             hobo_df = hobo_df.set_index(pd.DatetimeIndex(new_timestamp))
+        else:
+            hobo_df = hobo_df.set_index(pd.DatetimeIndex(hobo_df.timestamp))
         hobo_df = hobo_df.drop('timestamp', axis=1)
         full_df = results_df.join(hobo_df[self.hobo_data_columns], how='inner')
         return full_df
@@ -133,23 +135,23 @@ class ExperimentReducer(ExperimentMeta):
         pass
 
 
-def agg_top(x):
+class SumExperimentReducer(ExperimentReducer):
     """
-    Adds up all of the dispatchCount and duration values for each "tab". Ignores children.
-    :param x:
-    :return:
+    Performance Counter reduction using agg_top: sums all tabs
     """
-    duration = 0
-    dispatch_count = 0
-    num_windows = len(x)
-    for win_id, results in x.iteritems():
-        duration += results['duration']
-        dispatch_count += results['dispatchCount']
-    return pd.Series({'duration': duration, 'dispatch_count': dispatch_count, 'num_windows': num_windows})
 
-
-class AggExperimentReducer(ExperimentReducer):
     def reduce_perf_counters(self, raw_df):
-        reduce_df = raw_df.tabs.apply(agg_top)
+        reduce_df = raw_df.tabs.apply(agg_sum)
+        reduce_df['timestamp'] = raw_df['timestamp']
+        return reduce_df
+
+
+class Filter1ExperimentReducer(ExperimentReducer):
+    """
+    Performance Counter reduction using agg_top: sums all tabs
+    """
+
+    def reduce_perf_counters(self, raw_df):
+        reduce_df = raw_df.tabs.apply(filter_one)
         reduce_df['timestamp'] = raw_df['timestamp']
         return reduce_df
