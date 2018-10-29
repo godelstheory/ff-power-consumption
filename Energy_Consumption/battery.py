@@ -1,15 +1,9 @@
-import json
 import logging
 import subprocess
 import sys
 import threading
-import time
-from datetime import datetime
+
 from os import path
-
-from marionette_driver.marionette import Marionette
-
-from helpers.io_helpers import read_txt_file
 
 from mixins import NameMixin
 
@@ -24,13 +18,9 @@ class IntelPowerGadget(NameMixin):
         self.output_dir_path, self.output_file_name = path.split(output_file_path)
         self.output_file_prefix, self.output_file_ext = path.splitext(self.output_file_name)
         self.file_counter = 0
-
-        # __ipg_process = subprocess.Popen(['{}'.format(exe_file_path), '-duration', '600',
-        #                                   ''])
         thread = threading.Thread(target=self.run, args=(exe_file_path, duration))
         thread.daemon = True
         thread.start()
-        # self.run(exe_file_path, duration, output_file_path)
 
     def get_exe_default_path(self):
         platform = sys.platform.lower()
@@ -53,5 +43,3 @@ class IntelPowerGadget(NameMixin):
             output_file_path = self.get_output_file_path()
             print output_file_path
             subprocess.check_call([exe_file_path, '-duration', str(duration), '-file', output_file_path])
-
-

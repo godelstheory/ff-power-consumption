@@ -1,7 +1,11 @@
-from os import path
-from Energy_Consumption.experiment import PlugLoadExperiment, Tasks, Task
+import logging
 
-exp_id = 1
+from os import path
+from Energy_Consumption.experiment import Experiment, Tasks, Task
+
+logger = logging.getLogger()
+
+exp_id = 3
 
 
 class TasksTest(Tasks):
@@ -54,6 +58,6 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = PlugLoadExperiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
 
 exp.run()

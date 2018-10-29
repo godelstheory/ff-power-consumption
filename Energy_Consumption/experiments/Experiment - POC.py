@@ -1,5 +1,5 @@
 from os import path
-from Energy_Consumption.experiment import Experiment, Tasks, Task
+from Energy_Consumption.experiment import PlugLoadExperiment, Tasks, Task
 
 exp_id = 0
 
@@ -16,6 +16,6 @@ class TasksTest(Tasks):
 
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
+exp = PlugLoadExperiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
 
 exp.run()

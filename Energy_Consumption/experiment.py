@@ -11,6 +11,7 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
+from battery import IntelPowerGadget
 from performance_counter import PerformanceCounterTask, get_now
 
 logger = logging.getLogger(__name__)
@@ -54,14 +55,6 @@ class ExperimentMeta(NameMixin):
     def experiment_file_path(self, _):
         raise AttributeError('{}: experiment_file_path cannot be manually set'.format(self.name))
 
-    @property
-    def hobo_sync_log_tag(self):
-        return 'hobo_sync_marker'
-
-    @hobo_sync_log_tag.setter
-    def hobo_sync_log_tag(self, _):
-        raise AttributeError('{}: hobo_sync_log_tag cannot be manually set'.format(self.name))
-
 
 class Experiment(ExperimentMeta):
     """
@@ -77,8 +70,148 @@ class Experiment(ExperimentMeta):
         self.__tasks = tasks
         self.__ff_process = None
         self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
+        self.__ipg = None
         # ensure the experiment results directory exists and is cleaned out
         make_dir(self.exp_dir_path, clear=True)
+
+    def get_ff_default_path(self):
+        platform = sys.platform.lower()
+        if platform == 'darwin':
+            ff_exe_path = '/Applications/Firefox Nightly.app/Contents/MacOS/firefox'
+        elif platform == 'win32':
+            ff_exe_path = 'C:/Program Files/Firefox Nightly/firefox.exe'
+        else:
+            raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
+        return ff_exe_path
+
+    @property
+    def ff_exe_path(self):
+        return self.__ff_exe_path
+
+    @ff_exe_path.setter
+    def ff_exe_path(self, _):
+        raise AttributeError('{}: ff_exe_path cannot be manually set'.format(self.name))
+
+    @property
+    def perf_counters(self):
+        if self.__perf_counters is None:
+            self.__perf_counters = self.COUNTER_CLASS()
+        return self.__perf_counters
+
+    @perf_counters.setter
+    def perf_counters(self, value):
+        raise AttributeError('{}: perf_counters cannot be manually set'.format(self.name))
+
+    @property
+    def results(self):
+        return self.__results
+
+    @results.setter
+    def results(self, value):
+        raise AttributeError('{}: results cannot be manually set'.format(self.name))
+
+    @property
+    def tasks(self):
+        return self.__tasks
+
+    @tasks.setter
+    def tasks(self, value):
+        raise AttributeError('{}: tasks cannot be manually set'.format(self.name))
+
+    @property
+    def ff_process(self):
+        return self.__ff_process
+
+    @ff_process.setter
+    def ff_process(self, _):
+        raise AttributeError('{}: ff_process cannot be manually set'.format(self.name))
+
+    @property
+    def ipg_results_path(self):
+        return path.join(self.exp_dir_path, 'ipg_{}.txt'.format(self.exp_id))
+
+    @ipg_results_path.setter
+    def ipg_results_path(self, _):
+        raise AttributeError('{}: ipg_file_path cannot be manually set'.format(self.name))
+
+    @staticmethod
+    def start_client():
+        client = Marionette('localhost', port=2828)
+        client.start_session()
+        return client
+
+    def initialize(self, **kwargs):
+        duration = kwargs.get('duration', 60)
+        logger.debug('{}: initializing experiment'.format(self.name))
+        # start Firefox in Marionette mode subprocess
+        self.__ff_process = subprocess.Popen(['{}'.format(self.ff_exe_path), '--marionette'])
+        # Initialize client on tasks
+        self.tasks.client = self.start_client()
+        # connect to Firefox, begin collecting counters
+        _ = self.perf_counters
+        # fire up Intel Power Gadget
+        self.__ipg = IntelPowerGadget(duration=duration, output_file_path=self.ipg_results_path)
+
+        # log the experiment start
+        self.results.append({'timestamp': get_now(),
+                             'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
+
+    def run(self, **kwargs):
+        # begin experiment: start Firefox and logging performance counters
+        self.initialize(**kwargs)
+        # run tasks
+        self.perform_experiment(**kwargs)
+        # end experiment
+        self.finalize()
+
+    def perform_experiment(self, **kwargs):
+        self.results.extend(self.tasks.run(**kwargs))
+
+    def serialize(self):
+        with open(self.experiment_file_path, 'wb') as f:
+            json.dump(self.results, f, indent=4, sort_keys=True)
+        # with open(self.experiment_file_path, 'wb') as csv_file:
+        #     writer = csv.writer(csv_file, delimiter=',')
+        #     for result in self.results:
+        #         writer.writerow(list(result))
+
+    def finalize(self):
+        # serialize performance counters
+        self.perf_counters.dump_counters(self.perf_counter_file_path)
+        # save the experiment log
+        self.results.append({'timestamp': get_now(),
+                             'action': '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)})
+        self.serialize()
+        # kill the Firefox subprocess
+        self.__ff_process.terminate()
+
+
+class PlugLoadExperiment(ExperimentMeta):
+    """
+    Plug Load Experiment: Utilizes 120v wall outlet logger
+    """
+
+    COUNTER_CLASS = PerformanceCounterTask
+
+    def __init__(self, exp_id, exp_name, tasks, **kwargs):
+        super(PlugLoadExperiment, self).__init__(exp_id, exp_name, **kwargs)
+        self.__perf_counters = None
+        self.__results = []
+        self.__tasks = tasks
+        self.__ff_process = None
+        self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
+        # ensure the experiment results directory exists and is cleaned out
+        make_dir(self.exp_dir_path, clear=True)
+
+
+    @property
+    def hobo_sync_log_tag(self):
+        return 'hobo_sync_marker'
+
+    @hobo_sync_log_tag.setter
+    def hobo_sync_log_tag(self, _):
+        raise AttributeError('{}: hobo_sync_log_tag cannot be manually set'.format(self.name))
+
 
     def get_ff_default_path(self):
         platform = sys.platform.lower()
