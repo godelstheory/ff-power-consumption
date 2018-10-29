@@ -5,8 +5,9 @@ from os import path, chdir, system
 from helpers.io_helpers import make_dir
 
 
+num_seconds = 60
 output_dir_path = r'C:\Users\Experimenter\Desktop\powercomp'
-intel_pg_exe_path = r"C:\\Program Files\\Intel\\Power Gadget 3.5\\PowerLog3.0.exe"
+intel_pg_exe_path = 'C:/Program Files/Intel/Power Gadget 3.5/PowerLog3.0.exe'
 
 
 """
@@ -38,13 +39,11 @@ class BatteryReportTask(object):
 
 make_dir(output_dir_path, clear=True)
 
-num_seconds = 10
+
 brt = BatteryReportTask(output_dir_path)
 
-# 
-#                       '-file', path.join(output_dir_path, 'powerlog.txt')])
-# intel_pg_call = "{} -duration {} -file {}".format('"'+ intel_pg_exe_path + '"', 600, path.join(output_dir_path, 'powerlog.txt'))
-chdir(r"C:\\Program Files\\Intel\\Power Gadget 3.5")
-intel_pg_call = r"PowerLog3.0.exe -duration {}".format(str(600) )
-system(intel_pg_call)
-
+# TODO: Not working... Why?
+# chdir(r"C:\\Program Files\\Intel\\Power Gadget 3.5")
+# intel_pg_call = r"PowerLog3.0.exe -duration {}".format(str(600) )
+# system(intel_pg_call)
+subprocess.check_call([intel_pg_exe_path, '-duration', str(num_seconds), '-file', 'powerlog.txt'])
