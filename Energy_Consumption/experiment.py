@@ -73,6 +73,8 @@ class Experiment(ExperimentMeta):
         self.__ipg = None
         # ensure the experiment results directory exists and is cleaned out
         make_dir(self.exp_dir_path, clear=True)
+        self.duration = kwargs.get('duration', 60)
+        self.start_time = None
 
     def get_ff_default_path(self):
         platform = sys.platform.lower()
@@ -141,7 +143,6 @@ class Experiment(ExperimentMeta):
         return client
 
     def initialize(self, **kwargs):
-        duration = kwargs.get('duration', 60)
         logger.debug('{}: initializing experiment'.format(self.name))
         # start Firefox in Marionette mode subprocess
         self.__ff_process = subprocess.Popen(['{}'.format(self.ff_exe_path), '--marionette'])
@@ -150,11 +151,15 @@ class Experiment(ExperimentMeta):
         # connect to Firefox, begin collecting counters
         _ = self.perf_counters
         # fire up Intel Power Gadget
-        self.__ipg = IntelPowerGadget(duration=duration, output_file_path=self.ipg_results_path)
-
+        self.initialize_ipg(**kwargs)
         # log the experiment start
         self.results.append({'timestamp': get_now(),
                              'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
+
+    def initialize_ipg(self, **kwargs):
+        logger.debug('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
+        self.__ipg = IntelPowerGadget(duration=self.duration, output_file_path=self.ipg_results_path)
+        self.start_time = time.time()
 
     def run(self, **kwargs):
         # begin experiment: start Firefox and logging performance counters
@@ -182,6 +187,11 @@ class Experiment(ExperimentMeta):
         self.results.append({'timestamp': get_now(),
                              'action': '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)})
         self.serialize()
+        # wait to finish until Intel Power Gadget is done
+        while (time.time() - self.start_time) < self.duration:
+            wait_time = self.duration - (time.time() - self.start_time)
+            logger.debug('{}: Waiting {} sec until Intel Power Gadet is complete'.format(self.name, wait_time))
+            time.sleep(wait_time)
         # kill the Firefox subprocess
         self.__ff_process.terminate()
 
@@ -203,7 +213,6 @@ class PlugLoadExperiment(ExperimentMeta):
         # ensure the experiment results directory exists and is cleaned out
         make_dir(self.exp_dir_path, clear=True)
 
-
     @property
     def hobo_sync_log_tag(self):
         return 'hobo_sync_marker'
@@ -211,7 +220,6 @@ class PlugLoadExperiment(ExperimentMeta):
     @hobo_sync_log_tag.setter
     def hobo_sync_log_tag(self, _):
         raise AttributeError('{}: hobo_sync_log_tag cannot be manually set'.format(self.name))
-
 
     def get_ff_default_path(self):
         platform = sys.platform.lower()

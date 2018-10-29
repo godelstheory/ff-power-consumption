@@ -1,5 +1,6 @@
 import cPickle
 import logging
+import sys
 from os import path, makedirs, listdir, remove
 
 from text_helpers import always_str
@@ -45,3 +46,11 @@ def make_dir(dir_path, clear=False):
     elif clear:
         for file_name in listdir(dir_path):
             remove(path.join(dir_path, file_name))
+
+
+def log_to_stdout(logger, level=logging.INFO):
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(level)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
