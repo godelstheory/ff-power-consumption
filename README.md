@@ -1,6 +1,2 @@
-# desktop-adhoc-analysis
-Adhoc analyses for Firefox Desktop e.g. crashes/new users/retention/performance. Anything related to Firefox
-
-For a non trivial project e.g. more than 50 minutes of your time, file an issue in this repository.
-
-You may also start comitting new projects here too.
+# Firefox Power Consumption Experiments
+Codebase to perform and analyze power consumption experiments of Firefox performing various tasks. Internal Firefox counters are compared to (and hopefully utilized as a proxy thereof) power usage of various OS components. The latter is measured using Intel Power Gadget
