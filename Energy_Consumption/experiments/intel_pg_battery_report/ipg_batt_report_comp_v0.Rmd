@@ -1,0 +1,119 @@
+---
+title: "Intel Power Gadget to Battery Report"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xml2)
+library(readr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+```
+
+## Description
+This simple experiment involved an almost fully charged laptop that was sitting idle. Windows Battery Report was sampled each minute. Intel Power Gadget was started at the beginning, with a duration of one hour. 
+
+### Battery Report
+Define functions to extract the most recent `ChargeCapacity` from a Windows Battery Report xml file. 
+```{r batt_rep_import}
+extract_capacity <- function(xml_file_path){
+  xml <- read_file(xml_file_path)
+  br <- read_xml(str_remove(xml, 'xmlns=\"http://schemas.microsoft.com/battery/2012\"'))
+  entries <- xml_find_all(br, xpath="//RecentUsage/UsageEntry")
+  num_entries <- length(entries)
+  capacity <- xml_attrs(entries[num_entries])[[1]][c('ChargeCapacity', 'FullChargeCapacity', 'Timestamp')]
+  return(capacity)
+}
+
+results_dir_path <- 'data/powercomp'
+file_paths <- list.files(results_dir_path, '*batter_report_*', full.names=TRUE)
+
+results <- NULL
+for (file_path in file_paths){
+  iteration = str_match(file_path, 'batter_report_([0-9]+).xml')[,2]
+  result <- c(extract_capacity(file_path), as.numeric(iteration))
+  names(result) <- c('ChargeCapacity', 'FullChargeCapacity', 'Timestamp', 'Iteration')
+  results <- rbind(results, result)
+}
+
+results <- data.frame(results[-1, ], stringsAsFactors = FALSE)
+
+results$ChargeCapacity <- as.numeric(results$ChargeCapacity)
+results$FullChargeCapacity <- as.numeric(results$FullChargeCapacity)
+results$Iteration = as.numeric(results$Iteration)
+results$ratio <- results$ChargeCapacity/results$FullChargeCapacity
+
+results <- results[order(results$Iteration),]
+```
+
+The data is contained in a sub-directory `data`, and consists of `r length(file_paths)` Battery Report files: a sample for each minute. The xml contains a namespace reference that doesn't exist (oh so Windows!), which needs to be stripped out for xpath queries to work properly.
+
+The timestamps is converted to the number of minutes since the experiment started. This enables easy alignment with the Intel Power Gadget data.
+
+```{r batt_repo_clean}
+results$dates <- parse_date_time(results$Timestamp, 'YmdHMS')
+results$minutes <- (hour(results$dates)-7)*60+minute(results$dates)
+head(results[, c('Iteration', 'minutes', 'ChargeCapacity', 'ratio')], n=10)
+```
+
+Updating/resolution of Battery Report appears to be larger than one minute, as can be seen by repeated `ratio` values through time.
+
+### Intel Power Gadget
+The data is contained in a single file. It is a standard csv, but there is summary "fluff" at the end that was manually deleted to assist in importing.
+
+```{r ipg_import}
+ipg <- read.csv(file.path(results_dir_path, 'powerlog.txt'), stringsAsFactors = FALSE)
+ipg$clean_time <- hms(str_extract(ipg$System.Time, '^[0-9]+:[0-9]+:[0-9]+'))
+ipg$minutes <- (hour(ipg$clean_time))*60+minute(ipg$clean_time)
+```
+
+The Intel Power Gadget data is sampled at a much higher resolution. Therefore, reduce it down to minutes.
+```{r ipg_clean}
+ipg_comp <- ipg[!duplicated(ipg$minutes), ]
+```
+
+Three Intel Power Gadget measurements are processor, IA, and GT energy usage
+```{r ipg_plot, echo=FALSE}
+ggplot(ipg_comp, aes(minutes, Cumulative.Processor.Energy_0.mWh.)) +
+  geom_point()
+ggplot(ipg_comp, aes(minutes, Cumulative.IA.Energy_0.mWh.)) +
+  geom_point()
+ggplot(ipg_comp, aes(minutes, Cumulative.GT.Energy_0.mWh.)) +
+  geom_point()
+```
+
+## Comparison
+
+Merge the two datasets together.
+
+```{r final}
+final <- merge(results, ipg_comp, by='minutes')
+```
+
+Compare the battery report `ratio` with the Intel Power Gadget cumulative processor energy
+
+```{r final_plot_1, echo=FALSE}
+ggplot(final, aes(ratio, Cumulative.Processor.Energy_0.mWh.)) +
+  geom_point()+
+  geom_smooth(method='lm')
+```
+
+There is a strong relationship between Intel Power Gadget processor energy usage and the Battery Report usage. However, the first 3 Battery Report samples are all constant, despite changes observed in Intel Power Gadget. 
+
+```{r final_plot_2}
+final.cost <- final[-(1:3), ]
+# plot(final.cost$ratio, final.cost$Cumulative.Processor.Energy_0.mWh., type='l')
+ggplot(final.cost, aes(ratio, Cumulative.Processor.Energy_0.mWh.)) +
+  geom_point()+
+  geom_smooth(method='lm')
+```
+```{r final_comp}
+lm(ratio ~ Cumulative.Processor.Energy_0.mWh., final.cost)
+```
+## Next Steps
+The above trend needs to be observed under differing working conditions, to determine if it holds. 
+
+1. Use Marionette (or other automater) to put demand on the CPU, memory, etc... 
+2. Determine the conditions of the observed Battery Report update lag.
