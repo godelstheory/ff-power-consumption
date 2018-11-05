@@ -11,7 +11,7 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from battery import IntelPowerGadget
+from battery import IntelPowerGadget, read_ipg
 from performance_counter import PerformanceCounterTask, get_now
 
 logger = logging.getLogger(__name__)
@@ -136,6 +136,14 @@ class Experiment(ExperimentMeta):
     def ipg_results_path(self, _):
         raise AttributeError('{}: ipg_file_path cannot be manually set'.format(self.name))
 
+    @property
+    def ipg_clean_results_path(self):
+        return path.join(self.exp_dir_path, 'ipg_{}_clean.txt'.format(self.exp_id))
+
+    @ipg_clean_results_path.setter
+    def ipg_clean_results_path(self, _):
+        raise AttributeError('{}: ipg_clean_results_path cannot be manually set'.format(self.name))
+
     @staticmethod
     def start_client():
         client = Marionette('localhost', port=2828)
@@ -157,7 +165,7 @@ class Experiment(ExperimentMeta):
                              'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
 
     def initialize_ipg(self, **kwargs):
-        logger.debug('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
+        logger.info('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
         self.__ipg = IntelPowerGadget(duration=self.duration, output_file_path=self.ipg_results_path)
         self.start_time = time.time()
 
@@ -190,8 +198,12 @@ class Experiment(ExperimentMeta):
         # wait to finish until Intel Power Gadget is done
         while (time.time() - self.start_time) < self.duration:
             wait_time = self.duration - (time.time() - self.start_time)
-            logger.debug('{}: Waiting {} sec until Intel Power Gadet is complete'.format(self.name, wait_time))
+            logger.debug('{}: Waiting {} sec until Intel Power Gadget is complete'.format(self.name, wait_time))
             time.sleep(wait_time)
+        # strip the Intel Power Gadget file of summary garbage at end of txt file
+        logger.info('{}: Stripping Intel Power Gadget of funny end of file stuff.')
+        ipg = read_ipg(self.ipg_results_path)
+        ipg.to_csv(self.ipg_clean_results_path, index=False)
         # kill the Firefox subprocess
         self.__ff_process.terminate()
 

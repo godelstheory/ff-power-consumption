@@ -43,22 +43,22 @@ results <- data.frame(results[-1, ], stringsAsFactors = FALSE)
 results$ChargeCapacity <- as.numeric(results$ChargeCapacity)
 results$FullChargeCapacity <- as.numeric(results$FullChargeCapacity)
 results$Iteration = as.numeric(results$Iteration)
-results$ratio <- results$ChargeCapacity/results$FullChargeCapacity
+results$battery_capacity <- results$ChargeCapacity/results$FullChargeCapacity
 
 results <- results[order(results$Iteration),]
 ```
 
 The data is contained in a sub-directory `data`, and consists of `r length(file_paths)` Battery Report files: a sample for each minute. The xml contains a namespace reference that doesn't exist (oh so Windows!), which needs to be stripped out for xpath queries to work properly.
 
-The timestamps is converted to the number of minutes since the experiment started. This enables easy alignment with the Intel Power Gadget data.
+The timestamps are converted to the number of minutes. This enables easy alignment with the Intel Power Gadget data.
 
 ```{r batt_repo_clean}
 results$dates <- parse_date_time(results$Timestamp, 'YmdHMS')
 results$minutes <- (hour(results$dates)-7)*60+minute(results$dates)
-head(results[, c('Iteration', 'minutes', 'ChargeCapacity', 'ratio')], n=10)
+head(results[, c('Iteration', 'minutes', 'ChargeCapacity', 'battery_capacity')], n=10)
 ```
 
-Updating/resolution of Battery Report appears to be larger than one minute, as can be seen by repeated `ratio` values through time.
+Updating/resolution of Battery Report appears to be larger than one minute, as can be seen by repeated `battery_capacity` values through time.
 
 ### Intel Power Gadget
 The data is contained in a single file. It is a standard csv, but there is summary "fluff" at the end that was manually deleted to assist in importing.
@@ -92,10 +92,10 @@ Merge the two datasets together.
 final <- merge(results, ipg_comp, by='minutes')
 ```
 
-Compare the battery report `ratio` with the Intel Power Gadget cumulative processor energy
+Compare the battery report `battery_capacity` with the Intel Power Gadget cumulative processor energy
 
 ```{r final_plot_1, echo=FALSE}
-ggplot(final, aes(ratio, Cumulative.Processor.Energy_0.mWh.)) +
+ggplot(final, aes(battery_capacity, Cumulative.Processor.Energy_0.mWh.)) +
   geom_point()+
   geom_smooth(method='lm')
 ```
@@ -105,12 +105,12 @@ There is a strong relationship between Intel Power Gadget processor energy usage
 ```{r final_plot_2}
 final.cost <- final[-(1:3), ]
 # plot(final.cost$ratio, final.cost$Cumulative.Processor.Energy_0.mWh., type='l')
-ggplot(final.cost, aes(ratio, Cumulative.Processor.Energy_0.mWh.)) +
+ggplot(final.cost, aes(battery_capacity, Cumulative.Processor.Energy_0.mWh.)) +
   geom_point()+
   geom_smooth(method='lm')
 ```
 ```{r final_comp}
-lm(ratio ~ Cumulative.Processor.Energy_0.mWh., final.cost)
+lm(battery_capacity ~ Cumulative.Processor.Energy_0.mWh., final.cost)
 ```
 ## Next Steps
 The above trend needs to be observed under differing working conditions, to determine if it holds. 

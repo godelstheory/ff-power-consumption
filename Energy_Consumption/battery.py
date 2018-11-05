@@ -1,11 +1,15 @@
 import logging
+import pandas as pd
 import subprocess
 import sys
+import re
+from StringIO import StringIO
 import threading
 
 from os import path
 
 from mixins import NameMixin
+from helpers.io_helpers import read_txt_file
 
 logger = logging.getLogger(__name__)
 
@@ -43,3 +47,11 @@ class IntelPowerGadget(NameMixin):
             output_file_path = self.get_output_file_path()
             print output_file_path
             subprocess.check_call([exe_file_path, '-duration', str(duration), '-file', output_file_path])
+
+
+def read_ipg(ipg_file_path):
+    txt = read_txt_file(ipg_file_path)
+    txt_clean = re.split('"Total Elapsed Time', txt)
+    df = pd.read_csv(StringIO(txt_clean), quotechar='"')
+    return df
+
