@@ -1,18 +1,18 @@
 import json
-import logging
 import threading
 import time
 from datetime import datetime
 from os import path
 
 import psutil
+from structlog import get_logger
 
 from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import read_txt_file
 from mixins import NameMixin
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S.%f'
 
@@ -85,8 +85,6 @@ class CounterConnector(NameMixin):
 
     def run(self, **_):
         while True:
-            # TODO: end arg?
-            logger.debug('%s:', self.name)
             logger.debug(self.debug_arg)
             self.append_counters()
             time.sleep(self.interval)
@@ -107,6 +105,7 @@ class PsUtilTask(CounterConnector):
     """
     def __init__(self, method_names=('cpu_stats', 'cpu_times')):
         super(PsUtilTask, self).__init__()
+        logger.debug("create PsUtilTask")
         self.method_names = method_names
         self.counters.append(self.gen_cpu_stat_names(method_names=method_names))
 

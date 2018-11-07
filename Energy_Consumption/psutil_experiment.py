@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import json
 import logging
 import subprocess
@@ -15,14 +16,17 @@ from Energy_Consumption.performance_counter import (
     PsUtilTask, get_now)
 from helpers.io_helpers import make_dir
 
-logger = logging.getLogger(__name__)
+from structlog import get_logger; logger = get_logger()
 
 
 class PsUtilsExperiment(ExperimentMeta):
     """
     psutil experiment: Grab cpu and other system stats using psutil.
     """
-    def __init__(self, exp_id, exp_name, tasks, method_names, **kwargs):
+    def __init__(
+            self, exp_id, exp_name, tasks, method_names=('cpu_stats', 'cpu_times'),
+            **kwargs
+        ):
         super(PsUtilsExperiment, self).__init__(exp_id, exp_name, **kwargs)
         self.perf_counters = None
         self.results = []
@@ -32,7 +36,6 @@ class PsUtilsExperiment(ExperimentMeta):
         self.ff_exe_path = kwargs.get(
             'ff_exe_path', self.get_ff_default_path()
         )
-        self.exp_dir_path = self.exp_dir_path.copy()
         self.psu_loc = join(
             self.exp_dir_path,
             '{}_{}_psutil.json'.format(exp_name, exp_id)
@@ -65,7 +68,7 @@ class PsUtilsExperiment(ExperimentMeta):
         return client
 
     def initialize(self):
-        logger.debug('%s: initializing experiment', self.name)
+        logger.debug('{}: initializing experiment'.format(self.name))
         # logger.debug('{}: initializing experiment'.format(self.name))
         # start Firefox in Marionette mode subprocess
         self.ff_process = subprocess.Popen(
@@ -75,6 +78,7 @@ class PsUtilsExperiment(ExperimentMeta):
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting counters
         self.init_perf_counters()
+        self.perf_counters.start_thread()
         # log the experiment start
         self.results.append({
             'timestamp': get_now(),

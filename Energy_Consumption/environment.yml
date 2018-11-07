@@ -50,6 +50,7 @@ dependencies:
   # - black
   - pylint
   - psutil
+  - structlog
 
   # DL
   # - keras

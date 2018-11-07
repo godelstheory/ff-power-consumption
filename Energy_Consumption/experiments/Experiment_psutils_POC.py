@@ -1,8 +1,14 @@
 from os import path
+
+from structlog import get_logger
+
 # from Energy_Consumption.experiment import Tasks, Task
-from Energy_Consumption.experiment import PsUtilsExperiment, Tasks, Task
+from Energy_Consumption.psutil_experiment import PsUtilsExperiment
+from Energy_Consumption.experiment import Tasks, Task
+
 
 exp_id = 4
+logger = get_logger()
 
 
 class TasksTest(Tasks):
@@ -11,6 +17,7 @@ class TasksTest(Tasks):
         tasks = [
             Task("self.client.navigate('http://mozilla.org')", self.client,
                  meta={'website': 'http://mozilla.org'}),
+            Task('time.sleep(2)', self.client),
             Task("self.client.go_back()", self.client,
                  meta={'website': 'HOME'}),
             Task("self.client.go_forward()", self.client,
@@ -20,6 +27,9 @@ class TasksTest(Tasks):
 
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = PsUtilsExperiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest())
+exp = PsUtilsExperiment(
+    exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(),
+    method_names=['cpu_stats', 'cpu_times']
+)
 
 exp.run()
