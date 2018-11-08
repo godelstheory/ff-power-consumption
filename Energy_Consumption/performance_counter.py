@@ -58,6 +58,6 @@ class PerformanceCounterTask(PerformanceCounterConnector):
 
     def run(self):
         while True:
-            logger.info('{}: grabbing performance counters'.format(self.name))
+            logger.debug('{}: grabbing performance counters'.format(self.name))
             self.append_counters()
             time.sleep(self.interval)
