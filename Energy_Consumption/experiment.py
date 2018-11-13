@@ -138,14 +138,6 @@ class Experiment(ExperimentMeta):
     def ipg_results_path(self, _):
         raise AttributeError('{}: ipg_file_path cannot be manually set'.format(self.name))
 
-    # @property
-    # def ipg_clean_results_path(self):
-    #     return path.join(self.exp_dir_path, 'ipg_{}_clean.txt'.format(self.exp_id))
-    #
-    # @ipg_clean_results_path.setter
-    # def ipg_clean_results_path(self, _):
-    #     raise AttributeError('{}: ipg_clean_results_path cannot be manually set'.format(self.name))
-
     @staticmethod
     def start_client():
         client = Marionette('localhost', port=2828)
