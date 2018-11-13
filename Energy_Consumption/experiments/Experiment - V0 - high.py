@@ -5,8 +5,8 @@ from Energy_Consumption.experiment import Experiment, Tasks, Task
 from helpers.io_helpers import log_to_stdout
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-log_to_stdout(logger, level=logging.DEBUG)
+logger.setLevel(logging.INFO)
+log_to_stdout(logger, level=logging.INFO)
 
 exp_id = 5
 
@@ -18,7 +18,7 @@ class TasksTest(Tasks):
             # wait for 2 minutes
             Task('time.sleep(300)', self.client, meta={'website': 'HOME'}),
             # go to Mozilla.org
-            Task("https://www.lingscars.com/')", self.client,
+            Task("self.client.navigate('https://lingscars.com')", self.client,
                  meta={'website': 'https://www.lingscars.com/'}),
             # wait for 2 minutes
             Task('time.sleep(600)', self.client, meta={'website': 'HOME'}),
@@ -29,6 +29,6 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1200)
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1900)
 
 exp.run()
