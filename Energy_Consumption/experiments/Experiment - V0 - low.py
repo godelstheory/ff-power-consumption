@@ -19,7 +19,7 @@ class TasksTest(Tasks):
             Task('time.sleep(300)', self.client, meta={'website': 'HOME'}),
             # go to Mozilla.org
             Task("https://www.google.com/')", self.client,
-                 meta={'website': 'https://www.lingscars.com/'}),
+                 meta={'website': 'https://www.google.com/'}),
             # wait for 2 minutes
             Task('time.sleep(600)', self.client, meta={'website': 'HOME'}),
         ]
@@ -29,6 +29,6 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1200)
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=960)
 
 exp.run()
