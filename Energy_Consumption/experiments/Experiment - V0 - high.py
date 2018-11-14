@@ -29,6 +29,6 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1900)
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=960)
 
 exp.run()
