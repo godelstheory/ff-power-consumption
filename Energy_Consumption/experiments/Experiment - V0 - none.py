@@ -8,7 +8,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 log_to_stdout(logger, level=logging.INFO)
 
-exp_id = 6
+exp_id = 7
 
 
 class TasksTest(Tasks):
@@ -16,17 +16,7 @@ class TasksTest(Tasks):
     def tasks(self):
         tasks = [
             # wait for 2 minutes
-            Task('time.sleep(300)', self.client, meta={'website': 'HOME'}),
-            # go to Mozilla.org
-<<<<<<< HEAD
-            Task("self.client.navigate('https://google.com')", self.client,
-                 meta={'website': 'https://google.com/'}),
-=======
-            Task("https://www.google.com/')", self.client,
-                 meta={'website': 'https://www.google.com/'}),
->>>>>>> 896f7fac4952d3242ce08dd1aee75f49c0f4b1fa
-            # wait for 2 minutes
-            Task('time.sleep(600)', self.client, meta={'website': 'HOME'}),
+            Task('time.sleep(900)', self.client, meta={'website': 'HOME'}),
         ]
         return tasks
 
