@@ -1,0 +1,31 @@
+[
+    {
+        "action": "Experiment: Starting 5/Experiment - V0 - high", 
+        "timestamp": "2018-11-13 14:39:32.379000"
+    }, 
+    {
+        "action": "time.sleep(300)", 
+        "meta": {
+            "website": "HOME"
+        }, 
+        "timestamp": "2018-11-13 14:39:32.379000"
+    }, 
+    {
+        "action": "self.client.navigate('https://lingscars.com')", 
+        "meta": {
+            "website": "https://www.lingscars.com/"
+        }, 
+        "timestamp": "2018-11-13 14:44:32.379000"
+    }, 
+    {
+        "action": "time.sleep(600)", 
+        "meta": {
+            "website": "HOME"
+        }, 
+        "timestamp": "2018-11-13 14:45:06.566000"
+    }, 
+    {
+        "action": "Experiment: Ending 5/Experiment - V0 - high", 
+        "timestamp": "2018-11-13 14:55:06.999000"
+    }
+]
