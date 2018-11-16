@@ -1,0 +1,123 @@
+---
+title: 'Energy Consumption: Make It Or Break It!'
+author: "Corey Dow-Hygelund"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Description
+**Purpose** To determine if the internal Firefox metrics can be utilized as a proxy for battery drain in the extreme cases. The idea is to investigate if there is a relationship between the metrics and battery drain for cases where   ... (known high and low usage) 
+
+A suite of experiments were performed, which only differed on website
+1. Fire up Firefox in Marionette mode
+2. Wait 5 minutes
+3. Go to website
+4. Wait 10 minutes
+5. Stop experiment
+
+```{r}
+library(jsonlite)
+library(lubridate)
+library(stringr)
+
+parse_counters_sum <- function(file_path){
+  counters <- read_json(file_path)
+  df <- data.frame(timestamp=as.POSIXct(character()), seconds=integer(), duration=integer(), counters=integer())
+  for (counter in counters){
+    duration <- 0
+    counts <- 0
+    for (tab in counter$tabs) {
+      duration = duration + tab$duration
+      counts = counts + tab$dispatchCount
+    }
+    timestamp <- hms(str_split(ymd_hms(counter$timestamp), ' ')[[1]][2])
+    seconds <- hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp)
+    df <- rbind(df, list(timestamp=ymd_hms(counter$timestamp), seconds=seconds, 
+                duration=duration, counts=counts))
+  }
+  return(df)
+}
+
+parse_ipg <- function(file_path){
+  df <- read.csv(file_path, stringsAsFactors = FALSE)
+  clean_time <- hms(str_extract(df$System.Time, '^[0-9]+:[0-9]+:[0-9]+'))
+  df$seconds <- (hour(clean_time))*60*60+minute(clean_time)*60+second(clean_time)
+  return(df)
+}
+
+get_data <- function(counter_file_path, ipg_file_path){
+  df.counter <- parse_counters_sum(counter_file_path)
+  df.ipg <- parse_ipg(ipg_file_path)
+
+  final <- merge(df.counter, df.ipg, by='seconds')
+  final$stopwatch <- final$seconds - final$seconds[1]
+  return(final)
+}
+```
+
+
+```{r}
+root_dir = '/Users/chygelund/PycharmProjects/FF-power-consumption/Energy_Consumption/experiments/intel_pg_battery_report/data/make_or_break/'
+```
+
+# Experiment: Low
+## www.google.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'low/run 2/ipg_6_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+```
+
+```{r }
+plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
+plot(df$stopwatch, df$counts)
+plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+```
+
+ 
+```{r}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+```
+
+# Experiment: High
+## www.lingscars.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'high/run 1/ipg_5_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+```
+
+```{r }
+plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
+plot(df$stopwatch, df$counts)
+plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+```
+
+```{r}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$stopwatch<250, ])
+```
+```{r}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$stopwatch>400, ])
+```
+
+# Experiment: None
+## about:home
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'none/run 2/ipg_7_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+```
+
+```{r }
+plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
+plot(df$stopwatch, df$counts)
+plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+```
+
+```{r}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+```
