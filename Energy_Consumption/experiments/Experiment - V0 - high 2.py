@@ -8,7 +8,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 log_to_stdout(logger, level=logging.INFO)
 
-exp_id = 7
+exp_id = 8
 
 
 class TasksTest(Tasks):
