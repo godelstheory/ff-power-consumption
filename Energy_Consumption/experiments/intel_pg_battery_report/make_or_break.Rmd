@@ -10,13 +10,15 @@ output:
 **Purpose** To determine if the internal Firefox metrics can be utilized as a proxy for battery drain in the extreme cases. The idea is to investigate if there is a relationship between the metrics and battery drain for cases where   ... (known high and low usage) 
 
 A suite of experiments were performed, which only differed on website
+
+
 1. Fire up Firefox in Marionette mode
 2. Wait 5 minutes
 3. Go to website
 4. Wait 10 minutes
 5. Stop experiment
 
-```{r}
+```{r echo=FALSE, message=FALSE}
 library(jsonlite)
 library(lubridate)
 library(stringr)
@@ -67,33 +69,89 @@ get_data <- function(counter_file_path, ipg_file_path){
   return(final)
 }
   
-plot_data <- function(df, log){
+plot_data <- function(df, log=NULL, add_fit=TRUE){
+  a <- ggplot(df, aes(stopwatch, Cumulative.Processor.Energy_0.mWh.)) + 
+    geom_line() + 
+    geom_point()
+  b <- ggplot(df, aes(stopwatch, counts)) + 
+    geom_line() + 
+    geom_point()
+  c <- ggplot(df, aes(counts, Cumulative.Processor.Energy_0.mWh.)) + 
+    geom_line() + 
+    geom_point()
+  if(!missing(log)){
+    idx = df$stopwatch[df$seconds==log$seconds]
+    idx_pwr = df$Cumulative.Processor.Energy_0.mWh.[df$seconds==log$seconds]
+    a <- a + 
+      geom_text(x=idx, y=0.75*max(df$Cumulative.Processor.Energy_0.mWh.), 
+              label=log$action, color='blue') + 
+      geom_vline(xintercept = idx, linetype='dashed', color='red')
+    b <- b + 
+      geom_text(x=idx, y=0.75*max(df$counts), 
+              label=log$action, color='blue') + 
+      geom_vline(xintercept = idx, linetype='dashed', color='red')
+    c <- c + 
+      geom_text(x=idx, y=0.75*max(df$Cumulative.Processor.Energy_0.mWh.), 
+              label=log$action, color='blue') + 
+      geom_vline(xintercept = idx, linetype='dashed', color='red')
+  }
+  if(add_fit){
+    a <- a +
+      geom_smooth(method='lm')
+  }
+  print(a)
+  print(b)
+  print(c)
+}
+
+plot_clean_data <- function(df, log){
   idx = df$stopwatch[df$seconds==log$seconds]
-  idx_pwr = df$Cumulative.Processor.Energy_0.mWh.[df$seconds==log$seconds]
-  print(ggplot(df, aes(stopwatch, Cumulative.Processor.Energy_0.mWh.)) + 
+  a <- ggplot(df, aes(stopwatch, CPU.Processor.Energy.Excess)) + 
     geom_line() + 
     geom_point() +
-    geom_text(x=idx, y=0.75*max(df$Cumulative.Processor.Energy_0.mWh.), 
+    geom_text(x=idx, y=0.75*max(df$CPU.Processor.Energy.Excess), 
               label=log$action, color='blue') + 
-    geom_vline(xintercept = idx, linetype='dashed', color='red'))
-  print(ggplot(df, aes(stopwatch, counts)) + 
+      geom_vline(xintercept = idx, linetype='dashed', color='red')
+  c <- ggplot(df, aes(counts, CPU.Processor.Energy.Excess)) + 
     geom_line() + 
-    geom_point() +
-    geom_text(x=idx, y=0.75*max(df$counts), 
+    geom_point() + 
+      geom_text(x=idx, y=0.75*max(df$CPU.Processor.Energy.Excess), 
               label=log$action, color='blue') + 
-    geom_vline(xintercept = idx, linetype='dashed', color='red'))
-  print(ggplot(df, aes(Cumulative.Processor.Energy_0.mWh., counts)) + 
-    geom_line() + 
-    geom_point() +
-    geom_text(x=idx_pwr, y=0.75*max(df$counts), 
-              label=log$action, color='blue') + 
-    geom_vline(xintercept = idx_pwr, linetype='dashed', color='red'))
+      geom_vline(xintercept = idx, linetype='dashed', color='red')
+  print(a)
+  print(c)
+}
+
+remove_bg <- function(df, log){
+  model <- lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
+  cleaned <- df$Cumulative.Processor.Energy_0.mWh.- predict(model, df)
+  return(cleaned)
 }
 ```
 
 
 ```{r echo=FALSE}
 root_dir = '/Users/chygelund/PycharmProjects/FF-power-consumption/Energy_Consumption/experiments/intel_pg_battery_report/data/make_or_break/'
+```
+# Experiment: None
+## about:home
+No website navigation occurred. 
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'none/run 2/ipg_7_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_experiment.json'))
+```
+
+### Raw Values
+```{r echo=FALSE}
+plot_data(df)
+```
+
+Processor energy ~ time linear fit (Blue line)
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
 ```
 
 # Experiment: Low
@@ -104,15 +162,57 @@ counter_file_path <- file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_perf
 ipg_file_path <- file.path(root_dir, 'low/run 2/ipg_6_1_clean.txt')
 log <- get_action(file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_experiment.json'))
 df <- get_data(counter_file_path, ipg_file_path)
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
 ```
 
-```{r }
+## Raw Values
+```{r echo=FALSE}
 plot_data(df, log)
 ```
 
- 
-```{r}
+### Baseline Corrected
+Remove background energy usage:
+
+* fit a linear model to data before website navigation
+* Subtract linear model predicted values from CPU energy usage
+
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit (Blue line)
+```{r echo=FALSE}
 lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+```
+# Experiment: Medium
+## www.slate.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'medium/run 1/Experiment - V0 - high 2_8_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'medium/run 1/ipg_8_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'medium/run 1/Experiment - V0 - high 2_8_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log)
+```
+
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit: Before navigation
+```{r echo=FALSE}
+idx = df$stopwatch[df$seconds==log$seconds]
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
+```
+Processor energy ~ time linear fit: After navigation
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
 ```
 
 # Experiment: High
@@ -123,36 +223,32 @@ counter_file_path <- file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_pe
 ipg_file_path <- file.path(root_dir, 'high/run 1/ipg_5_1_clean.txt')
 df <- get_data(counter_file_path, ipg_file_path)
 log <- get_action(file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
 ```
 
-```{r }
-plot_data(df, log)
-```
-
-```{r}
-lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$stopwatch<250, ])
-```
-```{r}
-lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$stopwatch>400, ])
-```
-
-# Experiment: None
-## about:home
-
+## Raw Values
 ```{r echo=FALSE}
-counter_file_path <- file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_perf_counters.json')
-ipg_file_path <- file.path(root_dir, 'none/run 2/ipg_7_1_clean.txt')
-df <- get_data(counter_file_path, ipg_file_path)
-log <- get_action(file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_experiment.json'))
-```
-
-```{r }
 plot_data(df, log)
 ```
 
-```{r}
-lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit: Before navigation
+```{r echo=FALSE}
+idx = df$stopwatch[df$seconds==log$seconds]
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
+```
+Processor energy ~ time linear fit: After navigation
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
 ```
 
 # Observations
-The slope of the line processor energy line with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. 
+The slope of processor energy with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. This suggests a baseline/background CPU power usage.
+
+For the high experiments, there is a strong relationship between the CPU power consumption and the performance counters. The increase in the power consumption after website navigation, is directly attributable to the significant increase in the counters. 
+
+However, for the low and medium cases, with significantly lower counters, there appears to be little change in the CPU power usage from the background. This suggests that the relationship is far from straightforward.
