@@ -228,7 +228,7 @@ df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
 
 ## Raw Values
 ```{r echo=FALSE}
-plot_data(df, log)
+plot_data(df, log, add_fit=FALSE)
 ```
 
 ### Baseline Corrected
@@ -247,8 +247,6 @@ lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
 ```
 
 # Observations
-The slope of processor energy with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. This suggests a baseline/background CPU power usage.
+The slope of processor energy with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. This suggests a significant baseline/background CPU power usage.
 
-For the high experiments, there is a strong relationship between the CPU power consumption and the performance counters. The increase in the power consumption after website navigation, is directly attributable to the significant increase in the counters. 
-
-However, for the low and medium cases, with significantly lower counters, there appears to be little change in the CPU power usage from the background. This suggests that the relationship is far from straightforward.
+For the experiments, there is a relationship between the CPU power consumption and the performance counters, after correcting for the baseline power usage. The increase in the power consumption after website navigation, is attributable to the increase in the counters. 
