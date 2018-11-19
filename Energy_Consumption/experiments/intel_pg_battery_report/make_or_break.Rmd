@@ -20,6 +20,8 @@ A suite of experiments were performed, which only differed on website
 library(jsonlite)
 library(lubridate)
 library(stringr)
+library(ggplot2)
+library(plyr)
 
 parse_counters_sum <- function(file_path){
   counters <- read_json(file_path)
@@ -46,6 +48,16 @@ parse_ipg <- function(file_path){
   return(df)
 }
 
+get_action <- function(file_path){
+  log <- read_json(file_path)
+  log <- ldply(log, data.frame, stringsAsFactors=FALSE)
+  action <- log$action[3]
+  timestamp = hms(str_split(ymd_hms(log$timestamp[3]), ' ')[[1]][2])
+  seconds <- hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp)
+  return(list(action=action, seconds=seconds))
+}
+
+
 get_data <- function(counter_file_path, ipg_file_path){
   df.counter <- parse_counters_sum(counter_file_path)
   df.ipg <- parse_ipg(ipg_file_path)
@@ -54,10 +66,33 @@ get_data <- function(counter_file_path, ipg_file_path){
   final$stopwatch <- final$seconds - final$seconds[1]
   return(final)
 }
+  
+plot_data <- function(df, log){
+  idx = df$stopwatch[df$seconds==log$seconds]
+  idx_pwr = df$Cumulative.Processor.Energy_0.mWh.[df$seconds==log$seconds]
+  print(ggplot(df, aes(stopwatch, Cumulative.Processor.Energy_0.mWh.)) + 
+    geom_line() + 
+    geom_point() +
+    geom_text(x=idx, y=0.75*max(df$Cumulative.Processor.Energy_0.mWh.), 
+              label=log$action, color='blue') + 
+    geom_vline(xintercept = idx, linetype='dashed', color='red'))
+  print(ggplot(df, aes(stopwatch, counts)) + 
+    geom_line() + 
+    geom_point() +
+    geom_text(x=idx, y=0.75*max(df$counts), 
+              label=log$action, color='blue') + 
+    geom_vline(xintercept = idx, linetype='dashed', color='red'))
+  print(ggplot(df, aes(Cumulative.Processor.Energy_0.mWh., counts)) + 
+    geom_line() + 
+    geom_point() +
+    geom_text(x=idx_pwr, y=0.75*max(df$counts), 
+              label=log$action, color='blue') + 
+    geom_vline(xintercept = idx_pwr, linetype='dashed', color='red'))
+}
 ```
 
 
-```{r}
+```{r echo=FALSE}
 root_dir = '/Users/chygelund/PycharmProjects/FF-power-consumption/Energy_Consumption/experiments/intel_pg_battery_report/data/make_or_break/'
 ```
 
@@ -67,13 +102,12 @@ root_dir = '/Users/chygelund/PycharmProjects/FF-power-consumption/Energy_Consump
 ```{r echo=FALSE}
 counter_file_path <- file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_perf_counters.json')
 ipg_file_path <- file.path(root_dir, 'low/run 2/ipg_6_1_clean.txt')
+log <- get_action(file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_experiment.json'))
 df <- get_data(counter_file_path, ipg_file_path)
 ```
 
 ```{r }
-plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
-plot(df$stopwatch, df$counts)
-plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+plot_data(df, log)
 ```
 
  
@@ -88,12 +122,11 @@ lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
 counter_file_path <- file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_perf_counters.json')
 ipg_file_path <- file.path(root_dir, 'high/run 1/ipg_5_1_clean.txt')
 df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_experiment.json'))
 ```
 
 ```{r }
-plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
-plot(df$stopwatch, df$counts)
-plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+plot_data(df, log)
 ```
 
 ```{r}
@@ -110,14 +143,16 @@ lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$stopwatch>400, ])
 counter_file_path <- file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_perf_counters.json')
 ipg_file_path <- file.path(root_dir, 'none/run 2/ipg_7_1_clean.txt')
 df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_experiment.json'))
 ```
 
 ```{r }
-plot(df$stopwatch, df$Cumulative.Processor.Energy_0.mWh.)
-plot(df$stopwatch, df$counts)
-plot((df$Cumulative.Processor.Energy_0.mWh.), df$counts)
+plot_data(df, log)
 ```
 
 ```{r}
 lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
 ```
+
+# Observations
+The slope of the line processor energy line with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. 
