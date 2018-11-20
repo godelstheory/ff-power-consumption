@@ -5,10 +5,10 @@ from Energy_Consumption.experiment import Experiment, Tasks, Task
 from helpers.io_helpers import log_to_stdout
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-log_to_stdout(logger, level=logging.DEBUG)
+logger.setLevel(logging.INFO)
+log_to_stdout(logger, level=logging.INFO)
 
-exp_id = 3
+exp_id = 9
 
 
 class TasksTest(Tasks):

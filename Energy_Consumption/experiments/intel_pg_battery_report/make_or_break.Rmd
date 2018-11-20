@@ -59,6 +59,12 @@ get_action <- function(file_path){
   return(list(action=action, seconds=seconds))
 }
 
+parse_log <- function(file_path){
+  log <- read_json(file_path)
+  log <- ldply(log, data.frame, stringsAsFactors=FALSE)
+  return(log)
+}
+
 
 get_data <- function(counter_file_path, ipg_file_path){
   df.counter <- parse_counters_sum(counter_file_path)
@@ -244,6 +250,50 @@ lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
 Processor energy ~ time linear fit: After navigation
 ```{r echo=FALSE}
 lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
+```
+
+# Experiment: Combo
+## www.mozilla.com, www.twitch.com, www.twitch.tv/directory/game/Fortnite, https://addons.mozilla.org/en-US/firefox/
+
+Experimental run parameters differ from the above:
+
+
+1. Fire up Firefox in Marionette mode
+2. Wait 2 minutes
+3. Go to www.mozilla.com
+4. Wait 2 minutes
+5. Go backwards
+6. Wait 2 minutes
+7. Go forward (back on www.mozilla.com)
+8. Wait 30 seconds
+9. Go to www.twitch.com
+10. Wait 2 minutes
+11. Go to www.twitch.tv/directory/game/Fortnite
+12. Wait 2 minutes
+13. Go to https://addons.mozilla.org/en-US/firefox/
+14. Go backwards
+15. Go forwards
+16. Wait 2 minutes
+17. Stop experiment
+
+
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'combo/run 1/Experiment - V0 - combo_9_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'combo/run 1/ipg_9_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'combo/run 1/Experiment - V0 - combo_9_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log, add_fit=FALSE)
+```
+
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
 ```
 
 # Observations
