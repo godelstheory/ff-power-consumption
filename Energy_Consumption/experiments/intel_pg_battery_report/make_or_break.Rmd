@@ -62,7 +62,7 @@ get_action <- function(file_path){
 parse_log <- function(file_path){
   log <- read_json(file_path)
   log <- ldply(log, data.frame, stringsAsFactors=FALSE)
-  return(log)
+  return(log) 
 }
 
 
