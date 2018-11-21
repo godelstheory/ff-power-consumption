@@ -1,0 +1,87 @@
+name: nrg_legacy
+# channels:
+#  - defaults
+#  - conda-forge
+#  - pytorch
+dependencies:
+- python=2.7
+
+# Bare necessities
+- flake8
+- cython
+- pandas
+- xlrd
+- numba
+- seaborn
+- jupyterlab
+- simplejson
+# - notebook < 5
+
+# HTML
+- lxml
+- beautifulsoup4
+- requests
+- html5lib
+
+# ML
+# - pytorch
+- scikit-learn
+# - torchvision
+# - gensim  # =0.12.4
+# - pomegranate
+
+- joblib
+# - bcolz
+- fastparquet
+- dask
+- python-snappy
+- altair
+
+#- pymc3
+- pip:
+  - toolz
+  - marionette_driver
+  - pytest
+  - feather-format  # export MACOSX_DEPLOYMENT_TARGET=10.10
+  - line-profiler
+  - autopep8
+  # - flake8-mypy
+  - plotnine
+  # - black
+  - pylint
+  - psutil
+  - structlog
+
+  # DL
+  # - keras
+  # - chainer
+
+  # HTML
+  - requests_cache
+  - redis
+  - pandas_datareader
+  # - grequests
+
+  # TS
+  # - tsfresh
+  # - pyflux
+
+  # MISC
+  - fire
+  # - parsec
+  # - "ipython[notebook]<4"
+  # - snakeviz
+  # - pygraphviz
+  # - fuzzywuzzy
+  # - voluptuous
+  # - pystan
+  - python-dotenv>=0.5.1
+# - 'git+https://github.com/pymc-devs/pymc3'
+# jupyter contrib nbextension install --user --skip-running-check
+# jt -t grade3 -cellw '100%'
+
+# jupyter labextension install jupyterlab-toc jupyterlab_vim @jupyterlab/vega3-extension
+
+# flake8-mypy
+
+# pip install lenses
