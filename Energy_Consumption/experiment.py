@@ -1,6 +1,8 @@
 import abc
+import glob
 import json
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -11,7 +13,7 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from battery import IntelPowerGadget
+from battery import IntelPowerGadget, read_ipg
 from performance_counter import PerformanceCounterTask, get_now
 
 logger = logging.getLogger(__name__)
@@ -130,7 +132,7 @@ class Experiment(ExperimentMeta):
 
     @property
     def ipg_results_path(self):
-        return path.join(self.exp_dir_path, 'ipg_{}.txt'.format(self.exp_id))
+        return path.join(self.exp_dir_path, 'ipg_{}'.format(self.exp_id))
 
     @ipg_results_path.setter
     def ipg_results_path(self, _):
@@ -157,7 +159,7 @@ class Experiment(ExperimentMeta):
                              'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
 
     def initialize_ipg(self, **kwargs):
-        logger.debug('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
+        logger.info('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
         self.__ipg = IntelPowerGadget(duration=self.duration, output_file_path=self.ipg_results_path)
         self.start_time = time.time()
 
@@ -180,7 +182,8 @@ class Experiment(ExperimentMeta):
         #     for result in self.results:
         #         writer.writerow(list(result))
 
-    def finalize(self):
+    def finalize(self, **kwargs):
+        wait_interval = kwargs.get('wait_interval', 60)
         # serialize performance counters
         self.perf_counters.dump_counters(self.perf_counter_file_path)
         # save the experiment log
@@ -190,8 +193,17 @@ class Experiment(ExperimentMeta):
         # wait to finish until Intel Power Gadget is done
         while (time.time() - self.start_time) < self.duration:
             wait_time = self.duration - (time.time() - self.start_time)
-            logger.debug('{}: Waiting {} sec until Intel Power Gadet is complete'.format(self.name, wait_time))
+            logger.debug('{}: Waiting {} sec until Intel Power Gadget is complete'.format(self.name, wait_time))
             time.sleep(wait_time)
+        logger.info('{}: Waiting {} sec until Intel Power Gadget is found'.format(self.name, wait_interval))
+        while not glob.glob(path.join(self.ipg_results_path+'*')):
+            time.sleep(wait_interval)
+        # strip the Intel Power Gadget file of summary garbage at end of txt file
+        logger.info('{}: Stripping Intel Power Gadget of funny end of file stuff.')
+        for ipg_file_path in glob.glob(path.join(self.ipg_results_path+'*')):
+            ipg = read_ipg(ipg_file_path)
+            ipg_clean_file_path = ipg_file_path.replace(self.__ipg.output_file_ext, 'clean.txt')
+            ipg.to_csv(ipg_clean_file_path, index=False)
         # kill the Firefox subprocess
         self.__ff_process.terminate()
 
