@@ -11,4 +11,5 @@ statsmodels==0.9.0
 # Retrieve process information
 psutil==5.4.8
 
-
+# Misc
+structlog==18.2.0
