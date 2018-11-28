@@ -2,7 +2,6 @@ import abc
 import glob
 import json
 import logging
-import re
 import subprocess
 import sys
 import time
@@ -13,8 +12,8 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from battery import IntelPowerGadget, read_ipg
-from performance_counter import PerformanceCounterTask, get_now
+from Energy_Consumption.data_streams.battery import IntelPowerGadget, read_ipg
+from Energy_Consumption.data_streams.performance_counter import PerformanceCounterTask, get_now
 
 logger = logging.getLogger(__name__)
 

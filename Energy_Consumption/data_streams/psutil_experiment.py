@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import json
-import logging
 import subprocess
 import sys
 from os.path import join
@@ -12,7 +11,7 @@ from marionette_driver.marionette import Marionette
 from Energy_Consumption.experiment import ExperimentMeta
 # from Energy_Consumption.performance_counter import (
 #     PerformanceCounterTask, get_now)
-from Energy_Consumption.performance_counter import (
+from Energy_Consumption.data_streams.performance_counter import (
     PsUtilTask, get_now)
 from helpers.io_helpers import make_dir
 
