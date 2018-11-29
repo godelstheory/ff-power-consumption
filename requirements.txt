@@ -1,0 +1,15 @@
+# Drive Firefox
+marionette-driver==2.7.0
+
+# Data munging
+numpy==1.15.1
+pandas==0.23.4
+python-dateutil==2.7.3
+scipy==1.1.0
+statsmodels==0.9.0
+
+# Retrieve process information
+psutil==5.4.8
+
+# Misc
+structlog==18.2.0

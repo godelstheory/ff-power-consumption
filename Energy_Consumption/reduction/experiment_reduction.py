@@ -6,7 +6,7 @@ from os import path
 import pandas as pd
 
 from Energy_Consumption.experiment import ExperimentMeta
-from Energy_Consumption.performance_counter import TIMESTAMP_FMT
+from Energy_Consumption.data_streams.sampled_data import TIMESTAMP_FMT
 from Energy_Consumption.reduction.performance_reduction import agg_sum, filter_one
 
 
