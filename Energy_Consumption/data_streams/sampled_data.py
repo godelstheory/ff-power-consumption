@@ -34,14 +34,19 @@ class SampledDataRetriever(NameMixin):
         """ Log file message"""
         return
 
-    def run(self):
-        thread = threading.Thread(target=self.collect, args=())
-        thread.daemon = True
-        thread.start()
+    @abc.abstractproperty
+    def file_name(self):
+        """ Serialization file name"""
+        return
 
     @abc.abstractmethod
     def get_counters(self, **kwargs):
         return
+
+    def run(self):
+        thread = threading.Thread(target=self.collect, args=())
+        thread.daemon = True
+        thread.start()
 
     def collect(self):
         while True:
@@ -52,7 +57,8 @@ class SampledDataRetriever(NameMixin):
     def append_sample(self, **kwargs):
         self.samples.append(self.get_counters(**kwargs))
 
-    def dump_counters(self, file_path):
+    def dump_counters(self, dir_path):
+        file_path = path.join(dir_path, self.file_name)
         with open(file_path, 'w') as f:
             json.dump(self.samples, f, indent=4, sort_keys=True)
 
@@ -71,6 +77,9 @@ class PsutilDataRetriever(SampledDataRetriever):
 
     def message(self):
         return '{}: sampling psutil'.format(self.name)
+
+    def file_name(self):
+        return 'psutil_sampled_data.json'
 
     @staticmethod
     def gen_cpu_stat_names(method_names=('cpu_stats', 'cpu_times')):
@@ -95,18 +104,25 @@ class PerformanceCounterRetriever(SampledDataRetriever):
 
     def __init__(self):
         logger.debug("{}: instantiating".format(self.name))
-        logger.info('{}: connecting to Marionette and beginning session')
-        self.client = Marionette('localhost', port=2828)
-        self.client.start_session()
+        self.client = self.start_client()
         self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'retrieve_performance_counters.js'))
         super(PerformanceCounterRetriever, self).__init__()
+
+    def message(self):
+        return '{}: sampling performance counters'.format(self.name)
+
+    def file_name(self):
+        return 'ff_perf_counter_sampled_data.json'
+
+    @staticmethod
+    def start_client():
+        logger.info('{}: connecting to Marionette and beginning session')
+        client = Marionette('localhost', port=2828)
+        client.start_session()
+        return client
 
     def get_counters(self, **kwargs):
         with self.client.using_context(self.client.CONTEXT_CHROME):
             counters = {'tabs': self.client.execute_script(self.perf_getter_script),
                         'timestamp': get_now()}
         return counters
-
-    def message(self):
-        return '{}: sampling performance counters'.format(self.name)
-
