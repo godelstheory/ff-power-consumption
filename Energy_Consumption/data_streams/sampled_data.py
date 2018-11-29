@@ -6,14 +6,15 @@ from datetime import datetime
 from os import path
 
 import psutil
-from structlog import get_logger
+# from structlog import get_logger
+import logging
 
 from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import read_txt_file
 from mixins import NameMixin
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S.%f'
 
@@ -75,9 +76,11 @@ class PsutilDataRetriever(SampledDataRetriever):
         self.method_names = method_names
         self.samples.append(self.gen_cpu_stat_names(method_names=method_names))
 
+    @property
     def message(self):
         return '{}: sampling psutil'.format(self.name)
 
+    @property
     def file_name(self):
         return 'psutil_sampled_data.json'
 
@@ -104,13 +107,23 @@ class PerformanceCounterRetriever(SampledDataRetriever):
 
     def __init__(self):
         logger.debug("{}: instantiating".format(self.name))
-        self.client = self.start_client()
-        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'retrieve_performance_counters.js'))
+        self._client = None
+        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
+                                                          'retrieve_performance_counters.js'))
         super(PerformanceCounterRetriever, self).__init__()
 
+    @property
+    def client(self):
+        # Lazy-load to ensure Firefox process has been started
+        if self._client is None:
+            self._client = self.start_client()
+        return self._client
+
+    @property
     def message(self):
         return '{}: sampling performance counters'.format(self.name)
 
+    @property
     def file_name(self):
         return 'ff_perf_counter_sampled_data.json'
 

@@ -152,9 +152,9 @@ class Experiment(ExperimentMeta):
 
     def start_sampling_data(self):
         for data_retriever in self.sampled_data_retrievers:
-            data_retriever.collect()
+            data_retriever.run()
 
-    def initialize_ipg(self, _):
+    def initialize_ipg(self, **_):
         logger.info('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
         self.__ipg = IntelPowerGadget(duration=self.duration, output_file_path=self.ipg_results_path)
         self.start_time = time.time()
@@ -168,7 +168,7 @@ class Experiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.collect(**kwargs))
+        self.results.extend(self.tasks.run(**kwargs))
 
     def serialize(self):
         self.results.append({'timestamp': get_now(),
@@ -217,7 +217,7 @@ class PlugLoadExperiment(ExperimentMeta):
     Plug Load Experiment: Utilizes 120v wall outlet logger
     """
 
-    COUNTER_CLASS = SampledDataRetriever
+    COUNTER_CLASS = None
 
     def __init__(self, exp_id, exp_name, tasks, **kwargs):
         super(PlugLoadExperiment, self).__init__(exp_id, exp_name, **kwargs)
