@@ -94,7 +94,7 @@ class PsUtilsExperiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.collect(**kwargs))
+        self.results.extend(self.tasks.run(**kwargs))
 
     def serialize(self):
         with open(self.experiment_file_path, 'wb') as f:
