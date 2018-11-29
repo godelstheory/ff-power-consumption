@@ -396,7 +396,7 @@ class Tasks(NameMixin):
     def run(self, **kwargs):
         results = []
         for task in self.tasks:
-            results.append(task.collect(**kwargs))
+            results.append(task.run(**kwargs))
         return results
 
 
