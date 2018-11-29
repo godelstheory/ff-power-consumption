@@ -1,14 +1,16 @@
 from os import path
 
 from structlog import get_logger
+import logging
 
 # from Energy_Consumption.experiment import Tasks, Task
-from Energy_Consumption.data_streams.psutil_experiment import PsUtilsExperiment
+from Energy_Consumption.psutil_experiment import PsUtilsExperiment
 from Energy_Consumption.experiment import Tasks, Task
 
 
 exp_id = 4
 logger = get_logger()
+logger.setLevel(logging.INFO)
 
 
 class TasksTest(Tasks):

@@ -11,8 +11,8 @@ from marionette_driver.marionette import Marionette
 from Energy_Consumption.experiment import ExperimentMeta
 # from Energy_Consumption.performance_counter import (
 #     PerformanceCounterTask, get_now)
-from Energy_Consumption.data_streams.performance_counter import (
-    PsUtilTask, get_now)
+from Energy_Consumption.data_streams.sampled_data import (
+    PsutilDataRetriever, get_now)
 from helpers.io_helpers import make_dir
 
 from structlog import get_logger; logger = get_logger()
@@ -43,7 +43,7 @@ class PsUtilsExperiment(ExperimentMeta):
         make_dir(self.exp_dir_path, clear=True)
 
     def init_perf_counters(self):
-        self.perf_counters = PsUtilTask(method_names=self.method_names)
+        self.perf_counters = PsutilDataRetriever(method_names=self.method_names)
 
     def get_ff_default_path(self):
         platform = sys.platform.lower()
@@ -77,7 +77,7 @@ class PsUtilsExperiment(ExperimentMeta):
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting counters
         self.init_perf_counters()
-        self.perf_counters.start_thread()
+        self.perf_counters.run()
         # log the experiment start
         self.results.append({
             'timestamp': get_now(),
@@ -94,7 +94,7 @@ class PsUtilsExperiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.run(**kwargs))
+        self.results.extend(self.tasks.collect(**kwargs))
 
     def serialize(self):
         with open(self.experiment_file_path, 'wb') as f:

@@ -13,7 +13,7 @@ from marionette_driver.marionette import Marionette
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
 from Energy_Consumption.data_streams.battery import IntelPowerGadget, read_ipg
-from Energy_Consumption.data_streams.performance_counter import PerformanceCounterTask, get_now
+from Energy_Consumption.data_streams.sampled_data import SampledDataRetriever, get_now
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class Experiment(ExperimentMeta):
     Runs the experiment: fires up performance counters, ensures all data logging pieces in place, fires off Marionette tasks
     """
 
-    COUNTER_CLASS = PerformanceCounterTask
+    COUNTER_CLASS = SampledDataRetriever
 
     def __init__(self, exp_id, exp_name, tasks, **kwargs):
         super(Experiment, self).__init__(exp_id, exp_name, **kwargs)
@@ -171,7 +171,7 @@ class Experiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.run(**kwargs))
+        self.results.extend(self.tasks.collect(**kwargs))
 
     def serialize(self):
         with open(self.experiment_file_path, 'wb') as f:
@@ -212,7 +212,7 @@ class PlugLoadExperiment(ExperimentMeta):
     Plug Load Experiment: Utilizes 120v wall outlet logger
     """
 
-    COUNTER_CLASS = PerformanceCounterTask
+    COUNTER_CLASS = SampledDataRetriever
 
     def __init__(self, exp_id, exp_name, tasks, **kwargs):
         super(PlugLoadExperiment, self).__init__(exp_id, exp_name, **kwargs)
@@ -345,7 +345,7 @@ class PlugLoadExperiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.run(**kwargs))
+        self.results.extend(self.tasks.collect(**kwargs))
 
     def serialize(self):
         with open(self.experiment_file_path, 'wb') as f:
@@ -396,7 +396,7 @@ class Tasks(NameMixin):
     def run(self, **kwargs):
         results = []
         for task in self.tasks:
-            results.append(task.run(**kwargs))
+            results.append(task.collect(**kwargs))
         return results
 
 
