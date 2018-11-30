@@ -3,6 +3,7 @@ from os import path
 from helpers.io_helpers import log_to_stdout
 import logging
 from Energy_Consumption.experiment import Tasks, Task, Experiment
+from Energy_Consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,6 +29,8 @@ class TasksDebug(Tasks):
 
 
 exp_name = path.splitext(path.basename(__file__))[0]
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksDebug(), duration=60)
+sampled_data_retrievers=(PerformanceCounterRetriever(), PsutilDataRetriever())
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksDebug(), duration=60,
+                 sampled_data_retrievers=sampled_data_retrievers)
 
 exp.run()
