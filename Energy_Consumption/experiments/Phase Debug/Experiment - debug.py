@@ -13,6 +13,7 @@ log_to_stdout(logger, level=logging.INFO)
 
 exp_id = 100
 
+
 class TasksDebug(Tasks):
     @property
     def tasks(self):
@@ -29,7 +30,7 @@ class TasksDebug(Tasks):
 
 
 exp_name = path.splitext(path.basename(__file__))[0]
-sampled_data_retrievers=(PerformanceCounterRetriever(), PsutilDataRetriever())
+sampled_data_retrievers = (PerformanceCounterRetriever(), PsutilDataRetriever())
 exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksDebug(), duration=60,
                  sampled_data_retrievers=sampled_data_retrievers)
 

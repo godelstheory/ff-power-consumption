@@ -13,7 +13,7 @@ exp_id = 3
 
 class TasksTest(Tasks):
     @property
-    def tasks(self):
+    def tsks(self):
         tasks = [
             # wait for 2 minutes
             Task('time.sleep(120)', self.client, meta={'website': 'HOME'}),
