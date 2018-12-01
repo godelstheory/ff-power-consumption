@@ -70,7 +70,7 @@ class PsutilDataRetriever(SampledDataRetriever):
     come from `psutil.cpu_stats`.
     """
 
-    def __init__(self, method_names=('cpu_stats', 'cpu_times')):
+    def __init__(self, method_names=('cpu_stats', 'cpu_times', 'sensors_battery')):
         super(PsutilDataRetriever, self).__init__()
         logger.debug("{}: instantiating".format(self.name))
         self.method_names = method_names
