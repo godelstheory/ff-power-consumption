@@ -10,11 +10,6 @@ output_dir_path = r'C:\Users\Experimenter\Desktop\powercomp'
 intel_pg_exe_path = 'C:/Program Files/Intel/Power Gadget 3.5/PowerLog3.0.exe'
 
 
-"""
-Scratch the below: replace with addition thread for battery report.
-"""
-
-
 class BatteryReportTask(object):
     def __init__(self, output_dir_path, interval=1, **kwargs):
         super(BatteryReportTask, self).__init__(**kwargs)
