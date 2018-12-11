@@ -1,24 +1,25 @@
 import logging
 
 from os import path
-from Energy_Consumption.experiment import Experiment, Tasks, Task
+from energy_consumption.experiment import Experiment, Tasks, Task
 from helpers.io_helpers import log_to_stdout
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 log_to_stdout(logger, level=logging.INFO)
 
-exp_id = 8
+exp_id = 5
 
 
 class TasksTest(Tasks):
     @property
     def tasks(self):
         tasks = [
+            # wait for 2 minutes
             Task('time.sleep(300)', self.client, meta={'website': 'HOME'}),
             # go to Mozilla.org
-            Task("self.client.navigate('https://slate.com')", self.client,
-                 meta={'website': 'https://slate.com/'}),
+            Task("self.client.navigate('https://lingscars.com')", self.client,
+                 meta={'website': 'https://www.lingscars.com/'}),
             # wait for 2 minutes
             Task('time.sleep(600)', self.client, meta={'website': 'HOME'}),
         ]

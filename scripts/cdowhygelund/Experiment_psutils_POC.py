@@ -2,9 +2,9 @@ from os import path
 
 from structlog import get_logger
 
-# from Energy_Consumption.experiment import Tasks, Task
-from Energy_Consumption.psutil_experiment import PsUtilsExperiment
-from Energy_Consumption.experiment import Tasks, Task
+# from energy_consumption.experiment import Tasks, Task
+from energy_consumption.psutil_experiment import PsUtilsExperiment
+from energy_consumption.experiment import Tasks, Task
 
 
 exp_id = 4
