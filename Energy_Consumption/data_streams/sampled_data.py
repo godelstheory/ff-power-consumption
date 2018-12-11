@@ -1,5 +1,7 @@
 import abc
 import json
+import lxml
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -11,7 +13,7 @@ import logging
 
 from marionette_driver.marionette import Marionette
 
-from helpers.io_helpers import read_txt_file
+from helpers.io_helpers import read_txt_file, get_temp_filename
 from mixins import NameMixin
 
 logger = logging.getLogger(__name__)
@@ -70,8 +72,8 @@ class PsutilDataRetriever(SampledDataRetriever):
     come from `psutil.cpu_stats`.
     """
 
-    def __init__(self, method_names=('cpu_stats', 'cpu_times', 'sensors_battery')):
-        super(PsutilDataRetriever, self).__init__()
+    def __init__(self, interval=1, method_names=('cpu_stats', 'cpu_times', 'sensors_battery')):
+        super(PsutilDataRetriever, self).__init__(interval=interval)
         logger.debug("{}: instantiating".format(self.name))
         self.method_names = method_names
         self.samples.append(self.gen_cpu_stat_names(method_names=method_names))
@@ -105,12 +107,12 @@ class PsutilDataRetriever(SampledDataRetriever):
 
 class PerformanceCounterRetriever(SampledDataRetriever):
 
-    def __init__(self):
+    def __init__(self, interval=1):
         logger.debug("{}: instantiating".format(self.name))
         self._client = None
         self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
                                                           'retrieve_performance_counters.js'))
-        super(PerformanceCounterRetriever, self).__init__()
+        super(PerformanceCounterRetriever, self).__init__(interval=interval)
 
     @property
     def client(self):
@@ -139,3 +141,37 @@ class PerformanceCounterRetriever(SampledDataRetriever):
             counters = {'tabs': self.client.execute_script(self.perf_getter_script),
                         'timestamp': get_now()}
         return counters
+
+
+class WindowsBatteryReportRetriever(SampledDataRetriever):
+
+    def __init__(self, interval=1):
+        super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
+        self.__file_name = None
+
+    @property
+    def message(self):
+        return '{}: sampling Windows Battery Report'.format(self.name)
+
+    def get_battery_report(self, i):
+        batt_rep_file_path = path.join(self.output_dir_path, 'batter_report_{}.xml'.format(i))
+
+
+    def run(self):
+        i = 0
+        while True:
+            self.get_battery_report(i)
+            i += 1
+            time.sleep(self.interval)
+
+    @property
+    def file_name(self):
+        if self.file_name is None:
+            self.__file_name = get_temp_filename(None)
+        return self.__file_name
+
+    def get_counters(self, **kwargs):
+        subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
+
+
+

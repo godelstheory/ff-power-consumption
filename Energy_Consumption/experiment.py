@@ -12,7 +12,7 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from Energy_Consumption.data_streams.battery import IntelPowerGadget, read_ipg
+from Energy_Consumption.data_streams.intel_power_gadget import IntelPowerGadget, read_ipg
 from Energy_Consumption.data_streams.sampled_data import PerformanceCounterRetriever, get_now
 
 logger = logging.getLogger(__name__)

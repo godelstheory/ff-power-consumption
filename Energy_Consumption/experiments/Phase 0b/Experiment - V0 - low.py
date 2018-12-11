@@ -31,7 +31,7 @@ class TasksTest(Tasks):
 
 exp_name = path.splitext(path.basename(__file__))[0]
 sampled_data_retrievers = (PerformanceCounterRetriever(), PsutilDataRetriever())
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=60,
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=960,
                  sampled_data_retrievers=sampled_data_retrievers)
 
 exp.run()

@@ -21,7 +21,8 @@ Define functions to extract the most recent `ChargeCapacity` from a Windows Batt
 extract_capacity <- function(xml_file_path){
   xml <- read_file(xml_file_path)
   br <- read_xml(str_remove(xml, 'xmlns=\"http://schemas.microsoft.com/battery/2012\"'))
-  entries <- xml_find_all(br, xpath="//RecentUsage/UsageEntry") ## Use: EntryType="ReportGenerated"
+  ##TODO: Additional filter by attribute EntryType="ReportGenerated" (yields one node)
+  entries <- xml_find_all(br, xpath="//RecentUsage/UsageEntry")
   num_entries <- length(entries)
   capacity <- xml_attrs(entries[num_entries])[[1]][c('ChargeCapacity', 'FullChargeCapacity', 'Timestamp')]
   return(capacity)
