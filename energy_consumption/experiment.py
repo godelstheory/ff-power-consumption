@@ -2,7 +2,6 @@ import abc
 import glob
 import json
 import logging
-import re
 import subprocess
 import sys
 import time
@@ -23,7 +22,12 @@ class ExperimentMeta(NameMixin):
     def __init__(self, exp_id, exp_name, **kwargs):
         self.exp_id = exp_id
         self.__exp_name = exp_name
-        self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
+        self.__exp_dir_path = kwargs.get(
+            'exp_dir_path',
+            path.join(getcwd(), 'exp_{}_{}'.format(
+                exp_id, time.strftime('%Y%m%d_%H%M%S'))
+            )
+        )
 
     @property
     def exp_name(self):
