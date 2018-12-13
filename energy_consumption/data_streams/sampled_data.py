@@ -1,7 +1,7 @@
 import abc
 import json
-import lxml
-import subprocess
+# import lxml
+# import subprocess
 import threading
 import time
 from datetime import datetime
@@ -143,35 +143,35 @@ class PerformanceCounterRetriever(SampledDataRetriever):
         return counters
 
 
-class WindowsBatteryReportRetriever(SampledDataRetriever):
-
-    def __init__(self, interval=1):
-        super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
-        self.__file_name = None
-
-    @property
-    def message(self):
-        return '{}: sampling Windows Battery Report'.format(self.name)
-
-    def get_battery_report(self, i):
-        batt_rep_file_path = path.join(self.output_dir_path, 'batter_report_{}.xml'.format(i))
-
-
-    def run(self):
-        i = 0
-        while True:
-            self.get_battery_report(i)
-            i += 1
-            time.sleep(self.interval)
-
-    @property
-    def file_name(self):
-        if self.file_name is None:
-            self.__file_name = get_temp_filename(None)
-        return self.__file_name
-
-    def get_counters(self, **kwargs):
-        subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
+# class WindowsBatteryReportRetriever(SampledDataRetriever):
+#
+#     def __init__(self, interval=1):
+#         super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
+#         self.__file_name = None
+#
+#     @property
+#     def message(self):
+#         return '{}: sampling Windows Battery Report'.format(self.name)
+#
+#     def get_battery_report(self, i):
+#         batt_rep_file_path = path.join(self.output_dir_path, 'batter_report_{}.xml'.format(i))
+#
+#
+#     def run(self):
+#         i = 0
+#         while True:
+#             self.get_battery_report(i)
+#             i += 1
+#             time.sleep(self.interval)
+#
+#     @property
+#     def file_name(self):
+#         if self.file_name is None:
+#             self.__file_name = get_temp_filename(None)
+#         return self.__file_name
+#
+#     def get_counters(self, **kwargs):
+#         subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
 
 
 
