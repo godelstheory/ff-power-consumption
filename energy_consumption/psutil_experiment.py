@@ -9,10 +9,10 @@ from os.path import join
 from marionette_driver.marionette import Marionette
 
 # from battery import IntelPowerGadget
-from Energy_Consumption.experiment import ExperimentMeta
-# from Energy_Consumption.performance_counter import (
+from energy_consumption.experiment import ExperimentMeta
+# from energy_consumption.performance_counter import (
 #     PerformanceCounterTask, get_now)
-from Energy_Consumption.performance_counter import (
+from energy_consumption.performance_counter import (
     PsUtilTask, get_now)
 from helpers.io_helpers import make_dir
 

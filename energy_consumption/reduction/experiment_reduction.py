@@ -5,9 +5,9 @@ from os import path
 
 import pandas as pd
 
-from Energy_Consumption.experiment import ExperimentMeta
-from Energy_Consumption.performance_counter import TIMESTAMP_FMT
-from Energy_Consumption.reduction.performance_reduction import agg_sum, filter_one
+from energy_consumption.experiment import ExperimentMeta
+from energy_consumption.performance_counter import TIMESTAMP_FMT
+from energy_consumption.reduction.performance_reduction import agg_sum, filter_one
 
 
 class ExperimentReducer(ExperimentMeta):
