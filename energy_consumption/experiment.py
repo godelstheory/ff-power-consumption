@@ -12,8 +12,8 @@ from marionette_driver.marionette import Marionette
 
 from helpers.io_helpers import get_usr_input, make_dir
 from mixins import NameMixin
-from battery import IntelPowerGadget, read_ipg
-from performance_counter import PerformanceCounterTask, get_now
+from energy_consumption.data_streams.intel_power_gadget import IntelPowerGadget, read_ipg
+from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, get_now
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,7 @@ class ExperimentMeta(NameMixin):
     def __init__(self, exp_id, exp_name, **kwargs):
         self.exp_id = exp_id
         self.__exp_name = exp_name
-        self.__exp_dir_path = kwargs.get(
-            'exp_dir_path',
-            path.join(getcwd(), 'exp_{}_{}'.format(
-                exp_id, time.strftime('%Y%m%d_%H%M%S'))
-            )
-        )
+        self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
 
     @property
     def exp_name(self):
@@ -67,10 +62,9 @@ class Experiment(ExperimentMeta):
     Runs the experiment: fires up performance counters, ensures all data logging pieces in place, fires off Marionette tasks
     """
 
-    COUNTER_CLASS = PerformanceCounterTask
-
-    def __init__(self, exp_id, exp_name, tasks, **kwargs):
+    def __init__(self, exp_id, exp_name, tasks, sampled_data_retrievers=(PerformanceCounterRetriever(),), **kwargs):
         super(Experiment, self).__init__(exp_id, exp_name, **kwargs)
+        clear_exp_dir = kwargs.get('clear_exp_dir', True)
         self.__perf_counters = None
         self.__results = []
         self.__tasks = tasks
@@ -78,19 +72,10 @@ class Experiment(ExperimentMeta):
         self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
         self.__ipg = None
         # ensure the experiment results directory exists and is cleaned out
-        make_dir(self.exp_dir_path, clear=True)
+        make_dir(self.exp_dir_path, clear=clear_exp_dir)
         self.duration = kwargs.get('duration', 60)
         self.start_time = None
-
-    def get_ff_default_path(self):
-        platform = sys.platform.lower()
-        if platform == 'darwin':
-            ff_exe_path = '/Applications/Firefox Nightly.app/Contents/MacOS/firefox'
-        elif platform == 'win32':
-            ff_exe_path = 'C:/Program Files/Firefox Nightly/firefox.exe'
-        else:
-            raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
-        return ff_exe_path
+        self.sampled_data_retrievers = sampled_data_retrievers
 
     @property
     def ff_exe_path(self):
@@ -99,16 +84,6 @@ class Experiment(ExperimentMeta):
     @ff_exe_path.setter
     def ff_exe_path(self, _):
         raise AttributeError('{}: ff_exe_path cannot be manually set'.format(self.name))
-
-    @property
-    def perf_counters(self):
-        if self.__perf_counters is None:
-            self.__perf_counters = self.COUNTER_CLASS()
-        return self.__perf_counters
-
-    @perf_counters.setter
-    def perf_counters(self, value):
-        raise AttributeError('{}: perf_counters cannot be manually set'.format(self.name))
 
     @property
     def results(self):
@@ -144,25 +119,42 @@ class Experiment(ExperimentMeta):
 
     @staticmethod
     def start_client():
+        logger.info('{}: connecting to Marionette and beginning session')
         client = Marionette('localhost', port=2828)
         client.start_session()
         return client
 
+    def get_ff_default_path(self):
+        platform = sys.platform.lower()
+        if platform == 'darwin':
+            ff_exe_path = '/Applications/Firefox Nightly.app/Contents/MacOS/firefox'
+        elif platform == 'win32':
+            ff_exe_path = 'C:/Program Files/Firefox Nightly/firefox.exe'
+        else:
+            raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
+        return ff_exe_path
+
     def initialize(self, **kwargs):
         logger.debug('{}: initializing experiment'.format(self.name))
         # start Firefox in Marionette mode subprocess
-        self.__ff_process = subprocess.Popen(['{}'.format(self.ff_exe_path), '--marionette'])
+        self.__ff_process = None
+        if kwargs.get('start_ff', True):
+            self.__ff_process = subprocess.Popen([self.ff_exe_path, '--marionette'])
         # Initialize client on tasks
         self.tasks.client = self.start_client()
-        # connect to Firefox, begin collecting counters
-        _ = self.perf_counters
+        # connect to Firefox, begin collecting sampled data streams (e.g., performance counters, psutil)
+        self.start_sampling_data()
         # fire up Intel Power Gadget
         self.initialize_ipg(**kwargs)
         # log the experiment start
         self.results.append({'timestamp': get_now(),
                              'action': '{}: Starting {}/{}'.format(self.name, self.exp_id, self.exp_name)})
 
-    def initialize_ipg(self, **kwargs):
+    def start_sampling_data(self):
+        for data_retriever in self.sampled_data_retrievers:
+            data_retriever.run()
+
+    def initialize_ipg(self, **_):
         logger.info('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
         self.__ipg = IntelPowerGadget(duration=self.duration, output_file_path=self.ipg_results_path)
         self.start_time = time.time()
@@ -179,37 +171,45 @@ class Experiment(ExperimentMeta):
         self.results.extend(self.tasks.run(**kwargs))
 
     def serialize(self):
-        with open(self.experiment_file_path, 'wb') as f:
-            json.dump(self.results, f, indent=4, sort_keys=True)
-        # with open(self.experiment_file_path, 'wb') as csv_file:
-        #     writer = csv.writer(csv_file, delimiter=',')
-        #     for result in self.results:
-        #         writer.writerow(list(result))
-
-    def finalize(self, **kwargs):
-        wait_interval = kwargs.get('wait_interval', 60)
-        # serialize performance counters
-        self.perf_counters.dump_counters(self.perf_counter_file_path)
-        # save the experiment log
         self.results.append({'timestamp': get_now(),
                              'action': '{}: Ending {}/{}'.format(self.name, self.exp_id, self.exp_name)})
-        self.serialize()
-        # wait to finish until Intel Power Gadget is done
+        with open(self.experiment_file_path, 'wb') as f:
+            json.dump(self.results, f, indent=4, sort_keys=True)
+
+    def serialize_sampled_data(self):
+        for data_retriever in self.sampled_data_retrievers:
+            data_retriever.dump_counters(self.exp_dir_path)
+
+    def check_ipg_status(self, **kwargs):
+        wait_interval = kwargs.get('wait_interval', 60)
         while (time.time() - self.start_time) < self.duration:
             wait_time = self.duration - (time.time() - self.start_time)
             logger.debug('{}: Waiting {} sec until Intel Power Gadget is complete'.format(self.name, wait_time))
             time.sleep(wait_time)
         logger.info('{}: Waiting {} sec until Intel Power Gadget is found'.format(self.name, wait_interval))
-        while not glob.glob(path.join(self.ipg_results_path+'*')):
+        while not glob.glob(path.join(self.ipg_results_path + '*')):
             time.sleep(wait_interval)
-        # strip the Intel Power Gadget file of summary garbage at end of txt file
+
+    def clean_ipg_file(self):
+        # FIXME: Broken !!!
         logger.info('{}: Stripping Intel Power Gadget of funny end of file stuff.')
-        for ipg_file_path in glob.glob(path.join(self.ipg_results_path+'*')):
+        for ipg_file_path in glob.glob(path.join(self.ipg_results_path + '*')):
             ipg = read_ipg(ipg_file_path)
             ipg_clean_file_path = ipg_file_path.replace(self.__ipg.output_file_ext, 'clean.txt')
             ipg.to_csv(ipg_clean_file_path, index=False)
+
+    def finalize(self, **kwargs):
+        # serialize performance counters
+        self.serialize_sampled_data()
+        # save the experiment log
+        self.serialize()
+        # wait to finish until Intel Power Gadget is done
+        self.check_ipg_status(**kwargs)
+        # strip the Intel Power Gadget file of summary garbage at end of txt file
+        self.clean_ipg_file()
         # kill the Firefox subprocess
-        self.__ff_process.terminate()
+        if self.__ff_process is not None:
+            self.__ff_process.terminate()
 
 
 class PlugLoadExperiment(ExperimentMeta):
@@ -217,7 +217,7 @@ class PlugLoadExperiment(ExperimentMeta):
     Plug Load Experiment: Utilizes 120v wall outlet logger
     """
 
-    COUNTER_CLASS = PerformanceCounterTask
+    COUNTER_CLASS = None
 
     def __init__(self, exp_id, exp_name, tasks, **kwargs):
         super(PlugLoadExperiment, self).__init__(exp_id, exp_name, **kwargs)
@@ -350,7 +350,7 @@ class PlugLoadExperiment(ExperimentMeta):
         self.finalize()
 
     def perform_experiment(self, **kwargs):
-        self.results.extend(self.tasks.run(**kwargs))
+        self.results.extend(self.tasks.collect(**kwargs))
 
     def serialize(self):
         with open(self.experiment_file_path, 'wb') as f:
