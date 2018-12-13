@@ -1,0 +1,188 @@
+---
+title: 'Energy Consumption: Make It Or Break It!'
+author: "Corey Dow-Hygelund"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Description
+**Purpose** To determine if the internal Firefox metrics can be utilized as a proxy for battery drain in the extreme cases. The idea is to investigate if there is a relationship between the metrics and battery drain for websites where the battery is known to be extremely low or high. 
+
+A suite of experiments were performed, which only differed on website
+
+
+1. Fire up Firefox in Marionette mode
+2. Wait 5 minutes
+3. Go to website
+4. Wait 10 minutes
+5. Stop experiment
+
+```{r echo=FALSE, message=FALSE}
+source('data_munge.R')
+```
+
+```{r echo=FALSE}
+root_dir = '/Users/chygelund/PycharmProjects/FF-power-consumption/Energy_Consumption/experiments/intel_pg_battery_report/data/make_or_break/'
+```
+# Experiment: None
+## about:home
+No website navigation occurred. 
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'none/run 2/ipg_7_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'none/run 2/Experiment - V0 - none_7_experiment.json'))
+```
+
+### Raw Values
+```{r echo=FALSE}
+plot_data(df)
+```
+
+Processor energy ~ time linear fit (Blue line)
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+```
+
+# Experiment: Low
+## www.google.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'low/run 2/ipg_6_1_clean.txt')
+log <- get_action(file.path(root_dir, 'low/run 2/Experiment - V0 - low_6_experiment.json'))
+df <- get_data(counter_file_path, ipg_file_path)
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log)
+```
+
+### Baseline Corrected
+Remove background energy usage:
+
+* fit a linear model to data before website navigation
+* Subtract linear model predicted values from CPU energy usage
+
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit (Blue line)
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df)
+```
+# Experiment: Medium
+## www.slate.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'medium/run 1/Experiment - V0 - high 2_8_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'medium/run 1/ipg_8_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'medium/run 1/Experiment - V0 - high 2_8_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log)
+```
+
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit: Before navigation
+```{r echo=FALSE}
+idx = df$stopwatch[df$seconds==log$seconds]
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
+```
+Processor energy ~ time linear fit: After navigation
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
+```
+
+# Experiment: High
+## www.lingscars.com
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'high/run 1/ipg_5_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'high/run 1/Experiment - V0 - high_5_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log, add_fit=FALSE)
+```
+
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+Processor energy ~ time linear fit: Before navigation
+```{r echo=FALSE}
+idx = df$stopwatch[df$seconds==log$seconds]
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
+```
+Processor energy ~ time linear fit: After navigation
+```{r echo=FALSE}
+lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds>log$seconds, ])
+```
+
+# Experiment: Combo
+## www.mozilla.com, www.twitch.com, www.twitch.tv/directory/game/Fortnite, https://addons.mozilla.org/en-US/firefox/
+
+Experimental run parameters differ from the above:
+
+
+1. Fire up Firefox in Marionette mode
+2. Wait 2 minutes
+3. Go to www.mozilla.com
+4. Wait 2 minutes
+5. Go backwards
+6. Wait 2 minutes
+7. Go forward (back on www.mozilla.com)
+8. Wait 30 seconds
+9. Go to www.twitch.com
+10. Wait 2 minutes
+11. Go to www.twitch.tv/directory/game/Fortnite
+12. Wait 2 minutes
+13. Go to https://addons.mozilla.org/en-US/firefox/
+14. Go backwards
+15. Go forwards
+16. Wait 2 minutes
+17. Stop experiment
+
+
+
+```{r echo=FALSE}
+counter_file_path <- file.path(root_dir, 'combo/run 1/Experiment - V0 - combo_9_perf_counters.json')
+ipg_file_path <- file.path(root_dir, 'combo/run 1/ipg_9_1_clean.txt')
+df <- get_data(counter_file_path, ipg_file_path)
+log <- get_action(file.path(root_dir, 'combo/run 1/Experiment - V0 - combo_9_experiment.json'))
+df$CPU.Processor.Energy.Excess <- remove_bg(df, log)
+```
+
+## Raw Values
+```{r echo=FALSE}
+plot_data(df, log, add_fit=FALSE)
+```
+
+### Baseline Corrected
+```{r echo=FALSE}
+plot_clean_data(df, log)
+```
+
+# Observations
+The slope of processor energy with respect to time (seconds) is consistently ~0.5 for all experiments, save the high experiment upon navigation to the website. This suggests a significant baseline/background CPU power usage.
+
+For the experiments, there is a relationship between the CPU power consumption and the performance counters, after correcting for the baseline power usage. The increase in the power consumption after website navigation, is attributable to the increase in the counters. 

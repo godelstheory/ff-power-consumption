@@ -3,7 +3,7 @@ from os import path
 from structlog import get_logger
 
 # from energy_consumption.experiment import Tasks, Task
-from energy_consumption.psutil_experiment import PsUtilsExperiment
+from scripts.wbeard.psutil_experiment import PsUtilsExperiment
 from energy_consumption.experiment import Tasks, Task
 
 
