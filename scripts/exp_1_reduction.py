@@ -1,6 +1,6 @@
 from os import path
 
-from Energy_Consumption.reduction import experiment_reduction as reduce
+from energy_consumption.reduction import experiment_reduction as reduce
 
 
 # Sum all the performance counter tabs

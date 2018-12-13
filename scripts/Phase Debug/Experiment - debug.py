@@ -2,8 +2,8 @@ from os import path
 
 from helpers.io_helpers import log_to_stdout
 import logging
-from Energy_Consumption.experiment import Tasks, Task, Experiment
-from Energy_Consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
+from energy_consumption.experiment import Tasks, Task, Experiment
+from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

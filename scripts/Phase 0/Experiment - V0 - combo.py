@@ -1,10 +1,8 @@
 import logging
 
 from os import path
-from Energy_Consumption.experiment import Experiment, Tasks, Task
+from energy_consumption.experiment import Experiment, Tasks, Task
 from helpers.io_helpers import log_to_stdout
-from Energy_Consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
-
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -63,8 +61,6 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-sampled_data_retrievers = (PerformanceCounterRetriever(), PsutilDataRetriever())
-exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1200,
-                 sampled_data_retrievers=sampled_data_retrievers)
+exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1200)
 
 exp.run()

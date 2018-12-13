@@ -1,5 +1,5 @@
 from os import path
-from Energy_Consumption.experiment import PlugLoadExperiment, Tasks, Task
+from energy_consumption.experiment import PlugLoadExperiment, Tasks, Task
 
 exp_id = 0
 
