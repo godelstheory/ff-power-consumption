@@ -72,7 +72,7 @@ class Experiment(ExperimentMeta):
             task: tuple. Contains various Task for Marionette to perform
             sampled_data_retrievers: tuple. Contains various SampledDataRetriever
             Kwargs:
-                duration: int. # of seconds for Intel Power Gadget (IPG) to run. If not supplied, IPG isn't run.
+                duration: int. Default 60. # of seconds for Intel Power Gadget (IPG) to run.
             Return:
                 Experiment
         """
