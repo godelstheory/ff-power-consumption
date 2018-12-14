@@ -59,10 +59,23 @@ class ExperimentMeta(NameMixin):
 
 class Experiment(ExperimentMeta):
     """
-    Runs the experiment: fires up performance counters, ensures all data logging pieces in place, fires off Marionette tasks
+    Runs the experiment: fires up data samples, ensures all data logging pieces in place, fires off Marionette tasks
+
     """
 
-    def __init__(self, exp_id, exp_name, tasks, sampled_data_retrievers=(PerformanceCounterRetriever(),), **kwargs):
+    def __init__(self, exp_id, exp_name, tasks, sampled_data_retrievers=None, **kwargs):
+        """ Create an Experiment
+
+            Args:
+            exp_id:
+            exp_name:
+            task: tuple. Contains various Task for Marionette to perform
+            sampled_data_retrievers: tuple. Contains various SampledDataRetriever
+            Kwargs:
+                duration: int. Default 60. # of seconds for Intel Power Gadget (IPG) to run.
+            Return:
+                Experiment
+        """
         super(Experiment, self).__init__(exp_id, exp_name, **kwargs)
         clear_exp_dir = kwargs.get('clear_exp_dir', True)
         self.__perf_counters = None
@@ -75,6 +88,8 @@ class Experiment(ExperimentMeta):
         make_dir(self.exp_dir_path, clear=clear_exp_dir)
         self.duration = kwargs.get('duration', 60)
         self.start_time = None
+        if sampled_data_retrievers is None:
+            sampled_data_retrievers = (PerformanceCounterRetriever(),)
         self.sampled_data_retrievers = sampled_data_retrievers
 
     @property
