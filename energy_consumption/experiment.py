@@ -22,7 +22,12 @@ class ExperimentMeta(NameMixin):
     def __init__(self, exp_id, exp_name, **kwargs):
         self.exp_id = exp_id
         self.__exp_name = exp_name
-        self.__exp_dir_path = kwargs.get('exp_dir_path', path.join(getcwd(), 'exp_{}'.format(exp_id)))
+        self.__exp_dir_path = kwargs.get(
+            'exp_dir_path',
+            path.join(getcwd(), 'exp_{}_{}'.format(
+                exp_id, time.strftime('%Y%m%d_%H%M%S'))
+            )
+        )
 
     @property
     def exp_name(self):
@@ -88,9 +93,8 @@ class Experiment(ExperimentMeta):
         make_dir(self.exp_dir_path, clear=clear_exp_dir)
         self.duration = kwargs.get('duration', 60)
         self.start_time = None
-        if sampled_data_retrievers is None:
-            sampled_data_retrievers = (PerformanceCounterRetriever(),)
-        self.sampled_data_retrievers = sampled_data_retrievers
+        self.sampled_data_retrievers = sampled_data_retrievers or \
+            (PerformanceCounterRetriever(),)
 
     @property
     def ff_exe_path(self):
@@ -167,7 +171,7 @@ class Experiment(ExperimentMeta):
 
     def start_sampling_data(self):
         for data_retriever in self.sampled_data_retrievers:
-            data_retriever.run()
+            data_retriever.run(self.duration, self.exp_dir_path)
 
     def initialize_ipg(self, **_):
         logger.info('{}: Starting Intel Power Gadget to record for {}'.format(self.name, self.duration))
@@ -180,7 +184,7 @@ class Experiment(ExperimentMeta):
         # run tasks
         self.perform_experiment(**kwargs)
         # end experiment
-        self.finalize()
+        self.finalize(**kwargs)
 
     def perform_experiment(self, **kwargs):
         self.results.extend(self.tasks.run(**kwargs))
@@ -201,8 +205,8 @@ class Experiment(ExperimentMeta):
             wait_time = self.duration - (time.time() - self.start_time)
             logger.debug('{}: Waiting {} sec until Intel Power Gadget is complete'.format(self.name, wait_time))
             time.sleep(wait_time)
-        logger.info('{}: Waiting {} sec until Intel Power Gadget is found'.format(self.name, wait_interval))
         while not glob.glob(path.join(self.ipg_results_path + '*')):
+            logger.info('{}: Waiting {} sec until Intel Power Gadget is found'.format(self.name, wait_interval))
             time.sleep(wait_interval)
 
     def clean_ipg_file(self):
@@ -214,8 +218,6 @@ class Experiment(ExperimentMeta):
             ipg.to_csv(ipg_clean_file_path, index=False)
 
     def finalize(self, **kwargs):
-        # serialize performance counters
-        self.serialize_sampled_data()
         # save the experiment log
         self.serialize()
         # wait to finish until Intel Power Gadget is done

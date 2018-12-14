@@ -46,16 +46,20 @@ class SampledDataRetriever(NameMixin):
     def get_counters(self, **kwargs):
         return
 
-    def run(self):
-        thread = threading.Thread(target=self.collect, args=())
+    def run(self, duration, dir_path):
+        thread = threading.Thread(target=self.collect, args=(duration, dir_path))
         thread.daemon = True
         thread.start()
 
-    def collect(self):
-        while True:
+    def collect(self, duration=None, dir_path=None):
+        start = time.time()
+        while duration is None or time.time() < start + duration:
             logger.debug(self.message)
             self.append_sample()
             time.sleep(self.interval)
+
+        logger.debug("Dumping counters")
+        self.dump_counters(dir_path)
 
     def append_sample(self, **kwargs):
         self.samples.append(self.get_counters(**kwargs))
