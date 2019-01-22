@@ -44,10 +44,9 @@ class IntelPowerGadget(NameMixin):
         return output_file_path
 
     def run(self, exe_file_path, duration):
-        while True:
-            output_file_path = self.get_output_file_path()
-            subprocess.check_call([exe_file_path, '-duration', str(duration), '-resolution', str(self.sampling_rate),
-                                   '-file', output_file_path])
+        output_file_path = self.get_output_file_path()
+        subprocess.check_call([exe_file_path, '-duration', str(duration), '-resolution', str(self.sampling_rate),
+                               '-file', output_file_path])
 
 
 def read_ipg(ipg_file_path):
@@ -55,4 +54,3 @@ def read_ipg(ipg_file_path):
     txt_clean = re.split('"Total Elapsed Time', txt)[0]
     df = pd.read_csv(StringIO(txt_clean), quotechar='"')
     return df
-
