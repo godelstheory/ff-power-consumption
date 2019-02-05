@@ -86,7 +86,6 @@ class Experiment(ExperimentMeta):
         self.__perf_counters = None
         self.__results = []
         self.__tasks = tasks
-        self.__ff_process = None
         self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
         self.__ipg = None
         # ensure the experiment results directory exists and is cleaned out
@@ -95,14 +94,6 @@ class Experiment(ExperimentMeta):
         self.start_time = None
         self.sampled_data_retrievers = sampled_data_retrievers or \
             (PerformanceCounterRetriever(),)
-
-    @property
-    def ff_exe_path(self):
-        return self.__ff_exe_path
-
-    @ff_exe_path.setter
-    def ff_exe_path(self, _):
-        raise AttributeError('{}: ff_exe_path cannot be manually set'.format(self.name))
 
     @property
     def results(self):
@@ -121,14 +112,6 @@ class Experiment(ExperimentMeta):
         raise AttributeError('{}: tasks cannot be manually set'.format(self.name))
 
     @property
-    def ff_process(self):
-        return self.__ff_process
-
-    @ff_process.setter
-    def ff_process(self, _):
-        raise AttributeError('{}: ff_process cannot be manually set'.format(self.name))
-
-    @property
     def ipg_results_path(self):
         return path.join(self.exp_dir_path, 'ipg_{}'.format(self.exp_id))
 
@@ -136,10 +119,10 @@ class Experiment(ExperimentMeta):
     def ipg_results_path(self, _):
         raise AttributeError('{}: ipg_file_path cannot be manually set'.format(self.name))
 
-    @staticmethod
-    def start_client():
+    # @staticmethod
+    def start_client(self):
         logger.info('{}: connecting to Marionette and beginning session')
-        client = Marionette('localhost', port=2828)
+        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path())
         client.start_session()
         return client
 
@@ -155,10 +138,6 @@ class Experiment(ExperimentMeta):
 
     def initialize(self, **kwargs):
         logger.debug('{}: initializing experiment'.format(self.name))
-        # start Firefox in Marionette mode subprocess
-        self.__ff_process = None
-        if kwargs.get('start_ff', True):
-            self.__ff_process = subprocess.Popen([self.ff_exe_path, '--marionette'])
         # Initialize client on tasks
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting sampled data streams (e.g., performance counters, psutil)
@@ -224,9 +203,9 @@ class Experiment(ExperimentMeta):
         self.check_ipg_status(**kwargs)
         # strip the Intel Power Gadget file of summary garbage at end of txt file
         self.clean_ipg_file()
-        # kill the Firefox subprocess
-        if self.__ff_process is not None:
-            self.__ff_process.terminate()
+        # Stop Marionette and quit Firefox
+        # self.tasks.client.close()
+        self.tasks.client.quit(in_app=True)
 
 
 class PlugLoadExperiment(ExperimentMeta):
