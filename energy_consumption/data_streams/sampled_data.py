@@ -43,7 +43,7 @@ class SampledDataRetriever(NameMixin):
         return
 
     @abc.abstractmethod
-    def get_counters(self, **kwargs):
+    def get_sample(self, **kwargs):
         return
 
     def run(self, duration, dir_path):
@@ -62,7 +62,7 @@ class SampledDataRetriever(NameMixin):
         self.dump_counters(dir_path)
 
     def append_sample(self, **kwargs):
-        self.samples.append(self.get_counters(**kwargs))
+        self.samples.append(self.get_sample(**kwargs))
 
     def dump_counters(self, dir_path):
         file_path = path.join(dir_path, self.file_name)
@@ -100,7 +100,7 @@ class PsutilDataRetriever(SampledDataRetriever):
             dct.update({field: method_name for field in res._fields})
         return dct
 
-    def get_counters(self, **_):
+    def get_sample(self, **_):
         counters = {'timestamp': get_now()}
         for method_name in self.method_names:
             method = getattr(psutil, method_name)
@@ -133,18 +133,35 @@ class PerformanceCounterRetriever(SampledDataRetriever):
     def file_name(self):
         return 'ff_perf_counter_sampled_data.json'
 
-    @staticmethod
-    def start_client():
-        logger.info('{}: connecting to Marionette and beginning session')
+    def start_client(self):
+        logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
         client = Marionette('localhost', port=2828)
         client.start_session()
         return client
 
-    def get_counters(self, **kwargs):
+    def get_sample(self, **kwargs):
         with self.client.using_context(self.client.CONTEXT_CHROME):
             counters = {'tabs': self.client.execute_script(self.perf_getter_script),
                         'timestamp': get_now()}
         return counters
+
+
+class ProcessesRetriever(PerformanceCounterRetriever):
+
+    def __init__(self, interval=1):
+        logger.debug("{}: instantiating".format(self.name))
+        self._client = None
+        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
+                                                          'retrieve_process_info.js'))
+        super(PerformanceCounterRetriever, self).__init__(interval=interval)
+
+    @property
+    def message(self):
+        return '{}: sampling performance counters'.format(self.name)
+
+    @property
+    def file_name(self):
+        return 'ff_processes_sampled_data.json'
 
 
 # class WindowsBatteryReportRetriever(SampledDataRetriever):
