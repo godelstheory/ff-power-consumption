@@ -110,12 +110,12 @@ class PsutilDataRetriever(SampledDataRetriever):
 
 
 class PerformanceCounterRetriever(SampledDataRetriever):
+    JS_DIR_PATH = path.join(path.dirname(__file__), 'js')
 
     def __init__(self, interval=1):
         logger.debug("{}: instantiating".format(self.name))
         self._client = None
-        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
-                                                          'retrieve_performance_counters.js'))
+        self.perf_getter_script = read_txt_file(path.join(self.JS_DIR_PATH, 'retrieve_performance_counters.js'))
         super(PerformanceCounterRetriever, self).__init__(interval=interval)
 
     @property
@@ -146,23 +146,28 @@ class PerformanceCounterRetriever(SampledDataRetriever):
         return counters
 
 
-class ProcessesRetriever(PerformanceCounterRetriever):
+class PerformanceProcessesRetriever(PerformanceCounterRetriever):
+    """
+    Anything Marionette based needs to be merged into single class due to sampling issues.
+    """
 
     def __init__(self, interval=1):
-        logger.debug("{}: instantiating".format(self.name))
-        self._client = None
-        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
-                                                          'retrieve_process_info.js'))
-        super(PerformanceCounterRetriever, self).__init__(interval=interval)
+        super(PerformanceProcessesRetriever, self).__init__(interval=interval)
+        self.process_getter_script = read_txt_file(path.join(self.JS_DIR_PATH, 'retrieve_process_info.js'))
 
     @property
     def message(self):
-        return '{}: sampling performance counters'.format(self.name)
+        return '{}: sampling performance and process counters'.format(self.name)
 
     @property
     def file_name(self):
-        return 'ff_processes_sampled_data.json'
+        return 'ff_performance_processes_sampled_data.json'
 
+    def get_sample(self, **kwargs):
+        counters = super(PerformanceProcessesRetriever, self).get_sample(**kwargs)
+        with self.client.using_context(self.client.CONTEXT_CHROME):
+            counters.update({'processes': self.client.execute_script(self.process_getter_script)})
+        return counters
 
 # class WindowsBatteryReportRetriever(SampledDataRetriever):
 #
@@ -193,6 +198,3 @@ class ProcessesRetriever(PerformanceCounterRetriever):
 #
 #     def get_counters(self, **kwargs):
 #         subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
-
-
-

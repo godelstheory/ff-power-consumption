@@ -86,6 +86,7 @@ class Experiment(ExperimentMeta):
         self.__perf_counters = None
         self.__results = []
         self.__tasks = tasks
+        self.__ff_process = None
         self.__ff_exe_path = kwargs.get('ff_exe_path', self.get_ff_default_path())
         self.__ipg = None
         # ensure the experiment results directory exists and is cleaned out
@@ -121,8 +122,8 @@ class Experiment(ExperimentMeta):
 
     # @staticmethod
     def start_client(self):
-        logger.info('{}: connecting to Marionette and beginning session')
-        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path())
+        logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
+        client = Marionette('localhost', port=2828)
         client.start_session()
         return client
 
@@ -138,6 +139,9 @@ class Experiment(ExperimentMeta):
 
     def initialize(self, **kwargs):
         logger.debug('{}: initializing experiment'.format(self.name))
+        # start Firefox in Marionette mode subprocess
+        if kwargs.get('start_ff', True):
+            self.__ff_process = subprocess.Popen([self.__ff_exe_path, '--marionette'])
         # Initialize client on tasks
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting sampled data streams (e.g., performance counters, psutil)
@@ -203,9 +207,9 @@ class Experiment(ExperimentMeta):
         self.check_ipg_status(**kwargs)
         # strip the Intel Power Gadget file of summary garbage at end of txt file
         self.clean_ipg_file()
-        # Stop Marionette and quit Firefox
-        # self.tasks.client.close()
-        self.tasks.client.quit(in_app=True)
+        # kill the Firefox subprocess
+        if self.__ff_process is not None:
+            self.__ff_process.terminate()
 
 
 class PlugLoadExperiment(ExperimentMeta):

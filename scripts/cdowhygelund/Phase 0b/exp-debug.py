@@ -19,6 +19,7 @@ class TasksTest(Tasks):
             Task('time.sleep(10)', self.client, meta={'website': 'HOME'}),
             # go to Mozilla.org
             # Task("self.client.navigate('https://www.twitch.tv/')", self.client,
+          # Task("self.client.navigate('http://example.com/browser/widget/tests/browser/dummy.html')", self.client,
             Task("self.client.navigate('https://www.slate.com')", self.client,
                  meta={'website': 'https://twitch.com/'}),
             # wait for 2 minutes
@@ -30,8 +31,8 @@ class TasksTest(Tasks):
 """ DON'T MODIFY THE BELOW!!!!"""
 
 exp_name = path.splitext(path.basename(__file__))[0]
-sampled_data_retrievers = (sd.PerformanceCounterRetriever(), sd.PsutilDataRetriever(), sd.ProcessesRetriever())
-# sampled_data_retrievers = (sd.PerformanceCounterRetriever(), sd.PsutilDataRetriever())
+# sampled_data_retrievers = (sd.PerformanceProcessesRetriever(),)
+sampled_data_retrievers = (sd.PerformanceProcessesRetriever(), sd.PsutilDataRetriever())
 exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=20,
                  sampled_data_retrievers=sampled_data_retrievers)
 
