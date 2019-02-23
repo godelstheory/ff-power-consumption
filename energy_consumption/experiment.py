@@ -10,7 +10,7 @@ from os import path, getcwd
 
 from marionette_driver.marionette import Marionette
 
-from helpers.io_helpers import get_usr_input, make_dir, kill_proc_tree
+from energy_consumption.helpers.io_helpers import get_usr_input, make_dir, kill_proc_tree
 from mixins import NameMixin
 from energy_consumption.data_streams.intel_power_gadget import IntelPowerGadget, read_ipg
 from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, get_now

@@ -13,7 +13,7 @@ import logging
 
 from marionette_driver.marionette import Marionette
 
-from helpers.io_helpers import read_txt_file
+from energy_consumption.helpers.io_helpers import read_txt_file
 from mixins import NameMixin
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ import threading
 from os import path
 
 from mixins import NameMixin
-from helpers.io_helpers import read_txt_file
+from energy_consumption.helpers.io_helpers import read_txt_file
 
 logger = logging.getLogger(__name__)
 
