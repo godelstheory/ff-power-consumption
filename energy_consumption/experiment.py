@@ -10,7 +10,7 @@ from os import path, getcwd
 
 from marionette_driver.marionette import Marionette
 
-from helpers.io_helpers import get_usr_input, make_dir
+from helpers.io_helpers import get_usr_input, make_dir, kill_proc_tree
 from mixins import NameMixin
 from energy_consumption.data_streams.intel_power_gadget import IntelPowerGadget, read_ipg
 from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, get_now
@@ -209,7 +209,9 @@ class Experiment(ExperimentMeta):
         self.clean_ipg_file()
         # kill the Firefox subprocess
         if self.__ff_process is not None:
-            self.__ff_process.terminate()
+            kill_proc_tree(self.__ff_process.pid)
+            # self.__ff_process.terminate()
+
 
 
 class PlugLoadExperiment(ExperimentMeta):
