@@ -1,5 +1,6 @@
 import cPickle
 import logging
+import psutil
 import sys
 import tempfile
 from os import path, makedirs, listdir, remove
@@ -65,3 +66,14 @@ def get_temp_filename(root_dir_path=None):
     else:
         file_path = temp.name
     return file_path
+
+
+def kill_proc_tree(pid, including_parent=True):
+    parent = psutil.Process(pid)
+    children = parent.children(recursive=True)
+    for child in children:
+        child.kill()
+    gone, still_alive = psutil.wait_procs(children, timeout=5)
+    if including_parent:
+        parent.kill()
+        parent.wait(5)
