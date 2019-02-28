@@ -4,7 +4,7 @@ import time
 from os import path
 from energy_consumption.experiment import Experiment, Tasks, Task
 from energy_consumption.helpers.io_helpers import log_to_stdout
-from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
+from energy_consumption.data_streams.sampled_data import PerformanceProcessesRetriever, PsutilDataRetriever
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -54,7 +54,7 @@ def run_exp(exp_id, uri):
         exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=120,
     )
 
-    exp.run(wait_interval=10, sampled_data_retrievers=(PerformanceCounterRetriever(), PsutilDataRetriever()))
+    exp.run(wait_interval=10, sampled_data_retrievers=(PerformanceProcessesRetriever(), PsutilDataRetriever()))
 
     time.sleep(10)
 
