@@ -164,12 +164,15 @@ class Experiment(ExperimentMeta):
         self.start_time = time.time()
 
     def run(self, **kwargs):
-        # begin experiment: start Firefox and logging performance counters
-        self.initialize(**kwargs)
-        # run tasks
-        self.perform_experiment(**kwargs)
-        # end experiment
-        self.finalize(**kwargs)
+        try:
+            # begin experiment: start Firefox and logging performance counters
+            self.initialize(**kwargs)
+            # run tasks
+            self.perform_experiment(**kwargs)
+            # end experiment
+            self.finalize(**kwargs)
+        except Exception as e:
+            logger.error('{}: Failed due to {}\n{}'.format(self.name, e, traceback.format_exc()))
 
     def perform_experiment(self, **kwargs):
         self.results.extend(self.tasks.run(**kwargs))
@@ -302,6 +305,7 @@ class Task(NameMixin):
             exp = traceback.format_exc()
             logger.error('{}: Failed on task\n{}\n{}'.format(self.name, e, exp))
             result['meta']['error'] = exp
+            raise e
         return result
 
 

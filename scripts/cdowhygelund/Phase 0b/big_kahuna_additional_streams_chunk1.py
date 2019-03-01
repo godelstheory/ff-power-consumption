@@ -61,7 +61,7 @@ def run_exp(exp_id, uri):
     time.sleep(10)
 
 
-samples_per_page = 5
+samples_per_page = 4
 for _ in range(samples_per_page):
     for exp_id, uri in pages:
         run_exp(exp_id, uri)
