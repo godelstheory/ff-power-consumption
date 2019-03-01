@@ -52,10 +52,10 @@ def run_exp(exp_id, uri):
     exp_name = path.splitext(path.basename(__file__))[0]
     exp = Experiment(
         exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=150,
+        sampled_data_retrievers=(PerformanceProcessesRetriever(), PsutilDataRetriever())
     )
 
-    exp.run(wait_interval=10, sampled_data_retrievers=(PerformanceProcessesRetriever(), PsutilDataRetriever()))
-
+    exp.run(wait_interval=10)
     time.sleep(10)
 
 
