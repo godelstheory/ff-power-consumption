@@ -172,7 +172,9 @@ class Experiment(ExperimentMeta):
             # end experiment
             self.finalize(**kwargs)
         except Exception as e:
-            logger.error('{}: Failed due to {}\n{}'.format(self.name, e, traceback.format_exc()))
+            logger.error('{}: Experiment failed due to {}\n{}'.format(self.name, e, traceback.format_exc()))
+            with open(path.join(self.exp_dir_path, 'failure.alert')) as f:
+                f.write('Experimental data in this directory could be contaminated!\nUse at own risk!')
 
     def perform_experiment(self, **kwargs):
         self.results.extend(self.tasks.run(**kwargs))
