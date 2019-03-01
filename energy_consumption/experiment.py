@@ -123,7 +123,8 @@ class Experiment(ExperimentMeta):
     def start_client(self):
         logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
         client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(),
-                            prefs={"browser.tabs.remote.autostart": True})
+                            prefs={"browser.tabs.remote.autostart": True},
+                            gecko_log='-')
         # client = Marionette('localhost', port=2828)
         client.start_session()
         return client
