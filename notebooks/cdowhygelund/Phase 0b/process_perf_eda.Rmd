@@ -74,6 +74,12 @@ names(fits) <- exp
 names(r2) <- exp
 }
 ```
+
+**Observations**:
+1. CBS and Slate are dispatching huge numbers of counts, without increasing battery demand
+2. Twitch and Lingscars have significantly higher total energy usage, with less counters. 
+3. BBC and Youtube have similar total battery demand, with less counter usage. 
+
 ```{r}
 fits[r2 > 0.90]
 ```
@@ -182,6 +188,44 @@ Number of threads
 sapply(measures, function (x) length(x$processes$process$threads))
 ```
 
+#### Parent Resident Size
+
+```{r}
+get_memory_sizes <- function(measure){
+  x <- measure$processes$process
+  return(c(virtual=x$virtualMemorySize, resident=x$residentSetSize))
+}
+
+plot_resident_size <- function(dir_path){
+  exp <- basename(dir_path)
+  measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
+  seconds <- get_seconds(measures)
+  names(measures) <- paste(seconds, 's', sep='')
+  num_child_threads <- sapply(measures, get_memory_sizes)
+  mem_sizes <- num_child_threads %>% 
+    t %>% 
+    as.data.frame %>%
+    mutate(seconds = seconds) %>%
+    gather('type', 'load', -seconds)
+  
+  p <- ggplot(mem_sizes, aes(x=seconds, y=load, group=type)) +
+    geom_line() +
+    geom_point(aes(color=type)) +
+    labs(title=exp) +
+    theme_bw() +
+    guides(color=FALSE)
+  print(p)
+  # return(mem_sizes)
+}
+
+for (dir in dir('data/', full.names = TRUE)){
+  plot_resident_size(dir)
+}
+
+```
+
+Similar behavior between New York Times and Slate. Doesn't appear to be confounding influence.
+
 ### Children Process
 Number of children
 
@@ -289,6 +333,7 @@ Plot the # of children threads for all experiments
 
 ```{r}
 plot_num_children <- function(dir_path){
+  exp <- basename(dir_path)
   measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
   seconds <- get_seconds(measures)
   names(measures) <- paste(seconds, 's', sep='')
@@ -317,15 +362,12 @@ for (dir in dir('data/', full.names = TRUE)){
   results[[exp]] <- plot_num_children(dir)
 }
 
-
 ```
 
 
 New York Times and Slate have very similar plots, though very different slopes! Investigate this one further.
 
-Let's look into `residentSetSize` for parent
-```{r}
-results[['exp_bbc_article_20190301_110459']]
+
 ```
 
 
