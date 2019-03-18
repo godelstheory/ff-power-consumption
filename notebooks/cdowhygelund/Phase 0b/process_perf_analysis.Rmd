@@ -1,0 +1,517 @@
+---
+title: "Battery Consumption and Firefox Resource API"
+output: html_notebook
+---
+
+# Description
+A suite of experiments were performed under to help determine if the Firefox usage API can be utilized as a proxy for battery consumption. 
+
+
+Import the libraries used throughout the analysis
+
+```{r, message=FALSE}
+library(tibble)
+source('../data_munge.R')
+library(tidyr)
+library(cowplot)
+library(magrittr)
+```
+
+# Dataset Importing 
+
+Import the experimental data into two separate dataframes: one for performance counters, the other for process information
+```{r}
+datasets <- get_exp_data(exp_bounds = c(70, 120))
+```
+
+# Performance Counters
+Let's first examine the peformance counters. 
+
+Aggregate each run for a given URL, then fit a linear model
+```{r}
+exps <- names(datasets)
+perf_agg <- list()
+perf_lms <- list()
+for (exp in exps){
+  runs <- datasets[[exp]]
+  df <- datasets[[exp]] %>%
+    lapply(function(x) x$perf) %>%
+    bind_rows() %>%
+    add_column(exp = exp) %>% 
+    rename(battery_drain = Cumulative.Processor.Energy_0.mWh.) %>%
+    mutate(run_id = as.factor(run_id))
+  perf_agg[[exp]] <- df
+  perf_lms[[exp]] <- lm(battery_drain ~ counts, df)
+}
+```
+
+Create a suite of plots 
+```{r}
+for (exp in exps){
+  p <- ggplot(perf_agg[[exp]], aes(x = counts, y = battery_drain, group=run_id)) +
+    geom_smooth(method = "lm", se=TRUE, formula = y ~ x, aes(color=run_id)) +
+    geom_point(aes(color=run_id)) +
+    labs(title = exp)
+  print(p)
+}
+```
+
+Plots of Lings, CBC, Slate. 
+
+```{r}
+perf_url_df <- bind_rows(perf_agg[c('exp_cbc_article', 'exp_cbs_article', 'exp_lingscars', 'exp_slate')])
+ggplot(perf_url_df[perf_url_df$run_id < 5, ], aes(x = counts, y = battery_drain)) +
+    geom_point(aes(shape=run_id, color=exp)) 
+
+```
+
+
+```{r}
+perf_url_df <- bind_rows(perf_agg[c('exp_cbc_article', 'exp_cbs_article', 'exp_lingscars', 'exp_slate', 
+                                    'exp_livescience_article', 'exp_gizmodo_article', 'exp_cnet_article')])
+ggplot(perf_url_df[perf_url_df$run_id < 5, ], aes(x = counts, y = battery_drain)) +
+    geom_point(aes(shape=run_id, color=exp)) 
+
+```
+
+# Process Information
+
+## Child threads
+Investigate the difference in slopes between the runs of `exp_rt`, under the light of the process information.
+
+As per Tarek, child threads are the likely culprit.
+
+Isolate `exp_rt_article` and examine the child thread counts through time.
+
+```{r, fig.width = 10, fig.height = 10}
+rt_exp = datasets[['exp_rt_article']]
+
+get_num_child_threads <- function(measure){
+  threads = NULL
+  for(child in measure$processes$process$children){
+    threads <- c(threads, length(child$threads))
+  }
+  return(threads)
+}
+
+runs <- 1:length(rt_exp)
+plots <- list()
+for(run in runs){
+  # build the plotting df
+  seconds <- get_seconds(rt_exp[[run]]$process)
+  num_ct.df <- sapply(rt_exp[[run]]$process, get_num_child_threads)  %>%
+    data.frame %>% 
+    t %>% 
+    as.data.frame %>%
+    set_colnames(str_replace(names(.), 'V', 'Child_')) %>%
+    mutate(seconds = seconds) %>%
+    gather('child', 'num_threads', -seconds )
+  # plot it
+  p <- ggplot(num_ct.df, aes(x=seconds, y=num_threads, group=child)) +
+    geom_line() + 
+    geom_point(aes(color=child)) + 
+    theme_bw() +
+    labs(title=paste('Run', run)) + 
+    ylab('# of Threads') + 
+    ylim(10, 50) + 
+    geom_vline(xintercept=60, linetype='dashed', color='black')
+  if (run == 1) p <- p + theme(legend.position = c(0.14, 0.8))
+  else p <- p + guides(color=FALSE)
+    
+  plots[[run]] <- p 
+}
+
+print(plot_grid(plotlist = (plots)))
+```
+
+
+**Observation**: 
+* Child 3 (blue, content) is where the action lies at navigation to URL
+* Runs 1 and 4 have slightly _more_ threads than 2 and 3.
+  - 1 and 4 have smaller counter dependency on battery usage
+* Child 2 and 3 do differ at 60s, however they trend differently (run 1 lowest, 2 and 4 same, 3 highest)
+
+Next, let's examine these differences in the content threads observed.
+
+Define the custom data munge functions for content thead
+```{r}
+
+build_child_threads_df <- function(measures){
+  # Builds a dataframe of the child threads throughout the experiment
+  # Args:
+  #   measures: list of experimental run results. returned from jsonlite::read_json(<exp file>)
+  # Returns: 
+  #   data.frame of child threads. columns: type (cpuKernel or cpuUser), measure (reported value), second, tid, name
+  seconds <- get_seconds(measures)
+  df <- NULL
+  for(i in 1:length(measures)){
+    measure = measures[[i]]
+    df <- rbind(df, t(sapply(measure$processes$process$children[[3]]$thread, function(x) c(unlist(x), second=seconds[i]))))
+  }
+  
+  df <- df %>%
+    data.frame(stringsAsFactors = FALSE) %>%
+    mutate_at(.vars = vars(cpuKernel, cpuUser, second), .funs= funs(as.numeric)) %>%
+    arrange(second) %>%
+    gather("type", "measure", -tid, -second, -name)
+  return(df)
+}
+
+get_memory_sizes <- function(measure){
+  x <- measure$processes$process
+  return(c(virtual=x$virtualMemorySize, resident=x$residentSetSize))
+}
+
+# Define functions to calculate the difference in this cumulative value across time.
+calc_diff <- function(x){
+  delta <- diff(x$measure)
+  time <- x$second[2:nrow(x)]
+  name <- unique(x$name)[1]
+  if (length(time) != length(delta)) 
+    df <- data.frame(delta=as.numeric(), second=as.numeric(), name=character(), stringsAsFactors = FALSE)
+  else 
+    df <- data.frame(delta=delta, second=time, name = name, stringsAsFactors = FALSE)
+  return(df)
+  }
+
+calc_thread_diff <- function(df){
+  # Calculates the difference between each sample of a child thread 
+  # Args:
+  #   measures: data.frame returned by `build_chlid_threads_df`
+  # Returns: 
+  #   data.frame of child threads. columns: type (cpuKernel or cpuUser), measure (reported value), second, tid, name
+  df %>%
+    group_by(tid, type) %>%
+    do(calc_diff(.)) -> c.diff
+  return(c.diff)
+}
+```
+
+Apply them across experiments
+```{r}
+child_threads <- list()
+child_measures <- list()
+for(exp in names(datasets)){
+  child_threads[[exp]] <- lapply(datasets[[exp]], function(x) build_child_threads_df(x$process))
+  child_measures[[exp]] <- lapply(child_threads[[exp]], calc_thread_diff)
+}
+```
+
+Build a general purpose plotting function
+```{r}
+plot_child_threads <- function(child_threads_df, ymax, p_names, xlimits, metric = 'measure', type='cpuKernel'){
+  plots <- list()
+  for(run in 1:length(child_threads_df)){
+    exp <- child_threads_df[[run]]
+    if (!missing(p_names)) exp <- exp[exp$name %in% p_names, ]
+    p <- ggplot(exp[exp$type==type & exp[metric]>0, ], aes(x=second, y=get(metric)))+
+      # geom_line() +
+      geom_point(aes(color=name))+
+      theme_bw()+
+      labs(title=paste(type, ': Run', run)) +
+      ylab(metric) 
+    if (!missing(ymax)) p <- p + ylim(0, ymax)
+    if (!missing(xlimits)) p <- p + xlim(xlimits[1], xlimits[2])
+    plots[[run]] <- p
+  }
+  print(plot_grid(plotlist = plots))
+}
+```
+
+Take a look at `exp_rt`
+```{r}
+rt_child_threads <- child_threads[['exp_rt_article']]
+rt_measure <- child_measures[['exp_rt_article']]
+head(rt_child_threads[[1]])
+```
+
+```{r}
+lapply(rt_child_threads, function(x) table(x[x$second==74, ]$name ))
+```
+
+
+As per Tarek, many of threads are unnamed. We can see that there are two more unnamed threads for runs 1 and 4, that aren't in 2 and 3. There is also Cameras IPC threads in 1 and 4, missing in 2 and 3.  (Look at aggregated counts on these threads). 
+
+## CPU Time
+The measure column is the "time spent in nanoseconds by this thread in CPU time". Hence it is a measure of demand. Let's examine this one, focusing initially on the threads above. Let's examine this measure for threads when non-zero.
+
+### Child Threads: Maximum measure
+Find what are dominating the measures for each experiment:
+```{r}
+get_dominate_thread <- function(df, metric='measure', ctype='cpuUser'){
+  d <- df %>%
+    filter(type==ctype) %>%
+    arrange(desc(get(metric))) %>%
+    group_by(name) %>%
+    slice(1) %>%
+    arrange(desc(get(metric)))
+  return(head(d, n=5))
+}
+
+```
+#### Delta, cpuUser
+```{r}
+cpuUser_delta_top <- list()
+for(exp_name in names(child_measures)){
+  exp <- child_measures[[exp_name]]
+  cpuUser_delta_top[[exp_name]] <- exp %>%
+    lapply(get_dominate_thread, metric='delta', ctype='cpuUser') %>%
+    bind_rows()
+print(exp_name)
+print('------')
+print(unique(cpuUser_delta_top[[exp_name]]$name))
+print('')
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper', 'PaintThread')
+plot_child_threads(rt_child_threads, ymax = 2.5e9, p_names = p_names)
+```
+
+This pattern matches the observed counters:
+* Unnamed thread significant higher for runs 1 and 4
+* Run 4 has much higher than both unnamed and Chrome_ChildThread
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(rt_measure, p_names = p_names, metric = 'delta', ymax=1.25e8)
+```
+
+**Hypothesis**:
+*`Chrome_ChildThread` dominates battery usage. 
+* The `JS Helper` and `Socket Thread` are pushing the battery usage to higher usage values for 1 and 4.
+* The unnamed thread is creating a bunch of counts that _don't_ contribute to battery usage.
+  - Higher slope => lower battery slope
+
+Look at the User threads
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'Socket Thread', 'JS Helper', 'PaintThread')
+plot_child_threads(rt_child_threads, ymax=5e9, p_names = p_names, type='cpuUser')
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'Socket Thread', 'JS Helper')
+plot_child_threads(rt_measure, p_names = p_names, metric = 'delta', type='cpuUser', ymax=1.1e9)
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'Socket Thread', 'JS Helper')
+plot_child_threads(rt_measure, metric = 'delta', type='cpuUser', ymax=1.1e9, xlimits=c(70, 120),  p_names = p_names)
+```
+
+Bizarre behavior with unnamed thread, but is consistent with 1/4, 2/3 groups. Again, `JS_Helper` is much higher for 4, and less so for 1, then 2 and 3. `Chrome_ChildThread` consistent in this case. 
+
+## `livescience_article`
+Test hypothesis on another URL with similar behavior: `exp_livescience_article`
+
+```{r, fig.width = 12, fig.height = 8}
+livescience_exp = datasets[['exp_livescience_article']]
+livescience_child_threads <- lapply(live_science_exp, function(x) build_child_threads_df(x$process))
+livescience_measure <- lapply(livescience_child_threads, calc_thread_diff)
+  
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(livescience_child_threads, ymax = 2.5e9, p_names = p_names)
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(livescience_measure, ymax=2e8, p_names = p_names, metric = 'delta')
+```
+
+
+SWEET! Consistent with theory:
+* Higher `Chrome_ChildThread` on 1 leads to higher net usage. 
+* Hihger unnamed thread leads to higher counter usage. 
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(livescience_child_threads, ymax = 4.5e9, p_names = p_names, type='cpuUser')
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(livescience_measure, p_names = p_names, metric = 'delta', type='cpuUser')
+```
+
+**Observation**
+* Eratic behavior in no name thread aligns with lower slope
+
+## `nytimes`
+
+```{r, fig.width = 12, fig.height = 8}
+nyt_exp = datasets[['exp_nytimes']]
+nyt_child_threads <- lapply(nyt_exp, function(x) build_child_threads_df(x$process))
+
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(nyt_child_threads, ymax = 1.75e9, p_names = p_names)
+```
+
+ **Observation**
+* No name thread again associated with increased counters: 4 is least, however 1 and 3 _don't_ add up.  
+* `Chrome_ChildThread` associated with highest usage (2), but not by much. 
+* Also, not counters much less than previous two site
+* Something funny with this one!
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(nyt_child_threads, ymax = 5e9, p_names = p_names, type='cpuUser')
+```
+
+* Erratic no-name thread associated with lowest slope 
+
+## `cbc_article`
+```{r, fig.width = 12, fig.height = 8}
+cbc_exp = datasets[['exp_cbc_article']]
+cbc_child_threads <- lapply(cbc_exp, function(x) build_child_threads_df(x$process))
+
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(cbc_child_threads, ymax = 3e9, p_names = p_names)
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(cbc_child_threads, ymax = 5e9, p_names = p_names, type='cpuUser')
+```
+
+## `lingscars`
+```{r, fig.width = 12, fig.height = 8}
+lingscars_exp = datasets[['exp_lingscars']]
+lingscars_child_threads <- lapply(lingscars_exp, function(x) build_child_threads_df(x$process))
+lingscars_measure <- lapply(lingscars_child_threads, calc_thread_diff)
+
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(lingscars_child_threads, ymax = 1.5e9, p_names = p_names)
+```
+
+```{r}
+exp <- lingscars_child_threads[[1]]
+p <- ggplot(exp[exp$type=='cpuKernel' & exp['measure']>0, ], aes(x=second, y=measure))+
+      # geom_line() +
+      geom_point(aes(color=name))+
+      theme_bw()
+print(p)
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(lingscars_measure, ymax=1.5e8, p_names = p_names, metric = 'delta')
+```
+
+```{r, fig.width = 12, fig.height = 8}
+plot_child_threads(lingscars_measure, p_names, metric = 'delta')
+```
+
+
+**Observation**
+* Lingscars has _lower_ measure values! 
+* However, socket thread is heavily used
+* All no-name threads have same slope
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(lingscars_child_threads, ymax = 5e9, p_names = p_names, type='cpuUser')
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread','Socket Thread', 'JS Helper', 'PaintThread', 'StyleThread#2', 'StyleThread#1')
+plot_child_threads(lingscars_measure, ymax=1.5e9, p_names = p_names, metric = 'delta', type='cpuUser')
+```
+
+## 
+
+**TODO**
+1. Fit lines to chrome thread: see if that can predict net end use (i.e., delta battery/delta time)
+2. Fit linear model (random forest): counter, diff of child thread, JS helper, socket, no name
+   - features:
+    - Difference of Chrome_childThread: cpuKernel
+    - Difference of Chrome_childThread: cpuUser (deal with resetting)
+    - Difference of sum of no-name thread
+    - Difference of sum of JS Helper threads.
+    - Difference of sum of socket threads
+    - Difference of other threads: cpuUser and cpuKernel
+   - Slope of resets in cpuUser appears to be associated with higher usage!
+     - In all cases, other than lingscars and cbc, associated with lesser slope
+
+
+
+
+
+** KILL Below???**
+
+** Next steps **
+* Look at additional thread names for features
+* Additional feature: previous positive socket/js thread values
+
+
+Apply them 
+```{r}
+head(rt_measure[[1]])
+```
+
+```{r}
+lapply(rt_measure, function(x) (x[x$second==74 & x$delta > 0, ] ))
+```
+
+
+```{r}
+for(run in 1:length(rt_measure)){
+  exp <- rt_measure[[run]]
+  p <- ggplot(exp[exp$type=='cpuKernel' & exp$delta>0, ], aes(x=second, y=delta))+
+    geom_line() +
+    geom_point(aes(color=name))+
+    theme_bw()+
+    labs(title=paste('Run', run))
+  print(p)
+}
+
+```
+
+
+How many threads have non-zero counts throughout ramp up?
+
+
+**TODO**
+1. Create the distribution of lm coefficients for high R2
+   - Note that NYT has odd behaviour, youtube, bbc, (variation from low to high)
+   - Some of the fits have wonky behavior: popsci, 
+2. Examine # of parent processes, memory, etc...
+3. Examine child processes for similar URL with crazy change in slope!
+4. Give why Lingscars, Twitch so heavy
+
+
+
+And the plotters
+
+```{r}
+
+
+plot_resident_size <- function(dir_path){
+  exp <- basename(dir_path)
+  measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
+  seconds <- get_seconds(measures)
+  names(measures) <- paste(seconds, 's', sep='')
+  num_child_threads <- sapply(measures, get_memory_sizes)
+  mem_sizes <- num_child_threads %>% 
+    t %>% 
+    as.data.frame %>%
+    mutate(seconds = seconds) %>%
+    gather('type', 'load', -seconds)
+  
+  p <- ggplot(mem_sizes, aes(x=seconds, y=load, group=type)) +
+    geom_line() +
+    geom_point(aes(color=type)) +
+    labs(title=exp) +
+    theme_bw() +
+    guides(color=FALSE)
+  print(p)
+  # return(mem_sizes)
+}
+
+```
+
+
