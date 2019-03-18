@@ -45,16 +45,23 @@ for (exp in exps){
 }
 ```
 
-Create a suite of plots 
+Define a plotter
 ```{r}
-for (exp in exps){
-  p <- ggplot(perf_agg[[exp]], aes(x = counts, y = battery_drain, group=run_id)) +
+plot_perf_fits <- function(df, exp_name=exp_name){
+  p <- ggplot(df, aes(x = counts, y = battery_drain, group=run_id)) +
     geom_smooth(method = "lm", se=TRUE, formula = y ~ x, aes(color=run_id)) +
     geom_point(aes(color=run_id)) +
-    labs(title = exp)
-  print(p)
+    labs(title = exp_name)
+  return(p)
 }
 ```
+
+```{r}
+for (exp_name in exps){
+  plot(plot_perf_fits(perf_agg[[exp]], exp_name = exp_name))
+}
+```
+
 
 Plots of Lings, CBC, Slate. 
 
@@ -257,10 +264,14 @@ for(exp_name in names(child_measures)){
   cpuUser_delta_top[[exp_name]] <- exp %>%
     lapply(get_dominate_thread, metric='delta', ctype='cpuUser') %>%
     bind_rows()
-print(exp_name)
-print('------')
-print(unique(cpuUser_delta_top[[exp_name]]$name))
-print('')
+}
+
+cpuKernel_delta_top <- list()
+for(exp_name in names(child_measures)){
+  exp <- child_measures[[exp_name]]
+  cpuKernel_delta_top[[exp_name]] <- exp %>%
+    lapply(get_dominate_thread, metric='delta', ctype='cpuKernel') %>%
+    bind_rows()
 }
 
 ```
@@ -341,12 +352,19 @@ plot_child_threads(livescience_measure, p_names = p_names, metric = 'delta', typ
 * Eratic behavior in no name thread aligns with lower slope
 
 ## `nytimes`
+```{r}
+cpuKernel_delta_top[['exp_nytimes']]%>% arrange(delta) %>% distinct(name)
+```
+
+```{r}
+plot_perf_fits(perf_agg[['exp_nytimes']], exp_name = 'exp_nytimes')
+```
+
 
 ```{r, fig.width = 12, fig.height = 8}
-nyt_exp = datasets[['exp_nytimes']]
-nyt_child_threads <- lapply(nyt_exp, function(x) build_child_threads_df(x$process))
+nyt_child_thread = child_threads[['exp_nytimes']]
 
-p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+p_names <- c('', 'Chrome_ChildThread', 'Socket Thread', 'JS Helper', 'DOM Worker', 'MediaPlayback #2')
 plot_child_threads(nyt_child_threads, ymax = 1.75e9, p_names = p_names)
 ```
 
@@ -365,8 +383,8 @@ plot_child_threads(nyt_child_threads, ymax = 5e9, p_names = p_names, type='cpuUs
 
 ## `cbc_article`
 ```{r, fig.width = 12, fig.height = 8}
-cbc_exp = datasets[['exp_cbc_article']]
-cbc_child_threads <- lapply(cbc_exp, function(x) build_child_threads_df(x$process))
+cbc_child_threads <- child_threads[['exp_cbc_article']]
+
 
 p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
 plot_child_threads(cbc_child_threads, ymax = 3e9, p_names = p_names)
@@ -406,7 +424,6 @@ plot_child_threads(lingscars_measure, ymax=1.5e8, p_names = p_names, metric = 'd
 plot_child_threads(lingscars_measure, p_names, metric = 'delta')
 ```
 
-
 **Observation**
 * Lingscars has _lower_ measure values! 
 * However, socket thread is heavily used
@@ -422,7 +439,144 @@ p_names <- c('', 'Chrome_ChildThread','Socket Thread', 'JS Helper', 'PaintThread
 plot_child_threads(lingscars_measure, ymax=1.5e9, p_names = p_names, metric = 'delta', type='cpuUser')
 ```
 
-## 
+## `google`
+```{r}
+cpuKernel_delta_top[['exp_google']]%>% arrange(delta) %>% distinct(name)
+```
+
+```{r}
+plot_perf_fits(perf_agg[['exp_google']], exp_name = 'exp_nytimes')
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+google_child_threads = child_threads[['exp_google']]
+
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'JS Helper', 'Socket Thread', 'Paint Thread')
+plot_child_threads(google_child_threads, ymax = 8e8, p_names = p_names)
+```
+
+ **Observation**
+* No name thread again associated with increased counters: 4 is least, however 1 and 3 _don't_ add up.  
+* `Chrome_ChildThread` associated with highest usage (2), but not by much. 
+* Also, not counters much less than previous two site
+* Something funny with this one!
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
+plot_child_threads(nyt_child_threads, ymax = 5e9, p_names = p_names, type='cpuUser')
+```
+
+
+# Modeling 
+
+First look into a simple model: relate to overall battery drain
+* Look at net deltas for named threads across experiment
+* Ignore unnamed threads
+* Ignore performance counters while ignore performance counters)
+
+Calculate overall battery drain
+
+```{r}
+
+total_battery_drain <- list()
+for(exp_name in names(perf_agg)){
+  battery_delta <- perf_agg[[exp_name]] %>%
+    group_by(run_id) %>%
+    summarize(drain = diff(range(battery_drain))[1]) %>%
+    mutate(run_id = as.numeric(run_id)) %>%
+    add_column(exp=exp_name)
+  total_battery_drain[[exp_name]] <- battery_delta
+t_b_df <- bind_rows(total_battery_drain)
+}
+```
+
+```{r}
+t_b_df %>%
+  group_by(exp) %>%
+  summarize(drain = mean(drain)) %>%
+  arrange(desc(drain))
+```
+
+Next, build the aggregate child thread features
+
+```{r}
+
+child_measures_features<-function(exp_name, dfs){
+  exps <- list()
+  exp <- dfs[[exp_name]]
+  for(run_id in 1:length(exp)){
+    exp[[run_id]] %>%
+      mutate(delta=replace(delta, delta<0, 0)) %>%
+      filter(name != '' & second > 70 & second < 120) %>%
+      group_by(type) %>%
+      summarise(sum = sum(delta)) %>%
+      add_column(run_id = run_id, exp = exp_name) -> result
+    exps[[run_id]] <- result
+  }
+  return(bind_rows(exps))
+}
+c_features <- lapply(names(child_measures), child_measures_features, dfs = child_measures)
+```
+
+```{r}
+c_features_df <- bind_rows(c_features) %>% 
+  arrange(desc(sum))
+c_features_df
+```
+
+```{r}
+features_m1 <- c_features_df %>%
+  inner_join(t_b_df)
+
+f_m1_cpuUser <- features_m1[features_m1$type=='cpuUser', ]
+ggplot(f_m1_cpuUser, aes(sum, drain))+
+  geom_point(aes(color=exp)) + 
+  geom_smooth(method = "lm", se=TRUE, formula = y ~ x)+
+  guides(color=FALSE)
+```
+
+```{r}
+ggplot(f_m1_cpuUser[f_m1_cpuUser$drain < 90, ], aes(sum, drain))+
+  geom_point(aes(color=exp)) + 
+  geom_smooth(method = "lm", se=TRUE, formula = y ~ x)+
+  guides(color=FALSE)
+```
+
+```{r}
+f_m1_cpuKernel <- features_m1[features_m1$type=='cpuKernel', ]
+plot(f_m1_cpuKernel$sum, f_m1_cpuKernel$drain)
+```
+
+```{r}
+features_m1 %>%
+  group_by(run_id, exp) %>%
+  summarise(sum = sum(sum)) -> features_m1_sum
+
+plot(features_m1_sum$sum, features_m1_sum$drain)
+
+```
+
+
+Upon looking at the child thread behavior, an initial predictive model can be proposed. 
+
+## Feature generation
+The feature set is as follows:
+* Performance Counters
+* Difference of Chrome_childThread: cpuKernel
+* Difference of Chrome_childThread: cpuUser (deal with resetting)
+* Difference of sum of no-name thread
+* Difference of sum of JS Helper threads.
+* Difference of sum of socket threads
+* Difference of other threads: cpuUser and cpuKernel
+
+# ```{r}
+# generate_m1_features <- (c_df, delta_df, perf_df){
+#   
+# }
+# ```
+
+
 
 **TODO**
 1. Fit lines to chrome thread: see if that can predict net end use (i.e., delta battery/delta time)
@@ -438,41 +592,9 @@ plot_child_threads(lingscars_measure, ymax=1.5e9, p_names = p_names, metric = 'd
      - In all cases, other than lingscars and cbc, associated with lesser slope
 
 
-
-
-
-** KILL Below???**
-
 ** Next steps **
 * Look at additional thread names for features
 * Additional feature: previous positive socket/js thread values
-
-
-Apply them 
-```{r}
-head(rt_measure[[1]])
-```
-
-```{r}
-lapply(rt_measure, function(x) (x[x$second==74 & x$delta > 0, ] ))
-```
-
-
-```{r}
-for(run in 1:length(rt_measure)){
-  exp <- rt_measure[[run]]
-  p <- ggplot(exp[exp$type=='cpuKernel' & exp$delta>0, ], aes(x=second, y=delta))+
-    geom_line() +
-    geom_point(aes(color=name))+
-    theme_bw()+
-    labs(title=paste('Run', run))
-  print(p)
-}
-
-```
-
-
-How many threads have non-zero counts throughout ramp up?
 
 
 **TODO**
@@ -482,36 +604,5 @@ How many threads have non-zero counts throughout ramp up?
 2. Examine # of parent processes, memory, etc...
 3. Examine child processes for similar URL with crazy change in slope!
 4. Give why Lingscars, Twitch so heavy
-
-
-
-And the plotters
-
-```{r}
-
-
-plot_resident_size <- function(dir_path){
-  exp <- basename(dir_path)
-  measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
-  seconds <- get_seconds(measures)
-  names(measures) <- paste(seconds, 's', sep='')
-  num_child_threads <- sapply(measures, get_memory_sizes)
-  mem_sizes <- num_child_threads %>% 
-    t %>% 
-    as.data.frame %>%
-    mutate(seconds = seconds) %>%
-    gather('type', 'load', -seconds)
-  
-  p <- ggplot(mem_sizes, aes(x=seconds, y=load, group=type)) +
-    geom_line() +
-    geom_point(aes(color=type)) +
-    labs(title=exp) +
-    theme_bw() +
-    guides(color=FALSE)
-  print(p)
-  # return(mem_sizes)
-}
-
-```
 
 
