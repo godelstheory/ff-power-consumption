@@ -1,6 +1,8 @@
 import cPickle
 import logging
+import psutil
 import sys
+import tempfile
 from os import path, makedirs, listdir, remove
 
 from text_helpers import always_str
@@ -54,3 +56,24 @@ def log_to_stdout(logger, level=logging.INFO):
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+
+def get_temp_filename(root_dir_path=None):
+    temp = tempfile.NamedTemporaryFile(delete=False)
+    temp.close()
+    if root_dir_path is not None:
+        file_path = path.join(root_dir_path, path.basename(temp.name))
+    else:
+        file_path = temp.name
+    return file_path
+
+
+def kill_proc_tree(pid, including_parent=True):
+    parent = psutil.Process(pid)
+    children = parent.children(recursive=True)
+    for child in children:
+        child.kill()
+    gone, still_alive = psutil.wait_procs(children, timeout=5)
+    if including_parent:
+        parent.kill()
+        parent.wait(5)

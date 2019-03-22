@@ -2,7 +2,7 @@ import logging
 
 from os import path
 from energy_consumption.experiment import Experiment, Tasks, Task
-from helpers.io_helpers import log_to_stdout
+from energy_consumption.helpers.io_helpers import log_to_stdout
 from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
 
 logger = logging.getLogger()

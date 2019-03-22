@@ -13,7 +13,7 @@ import logging
 
 from marionette_driver.marionette import Marionette
 
-from helpers.io_helpers import read_txt_file
+from energy_consumption.helpers.io_helpers import read_txt_file
 from mixins import NameMixin
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class SampledDataRetriever(NameMixin):
         return
 
     @abc.abstractmethod
-    def get_counters(self, **kwargs):
+    def get_sample(self, **kwargs):
         return
 
     def run(self, duration, dir_path):
@@ -62,7 +62,7 @@ class SampledDataRetriever(NameMixin):
         self.dump_counters(dir_path)
 
     def append_sample(self, **kwargs):
-        self.samples.append(self.get_counters(**kwargs))
+        self.samples.append(self.get_sample(**kwargs))
 
     def dump_counters(self, dir_path):
         file_path = path.join(dir_path, self.file_name)
@@ -100,7 +100,7 @@ class PsutilDataRetriever(SampledDataRetriever):
             dct.update({field: method_name for field in res._fields})
         return dct
 
-    def get_counters(self, **_):
+    def get_sample(self, **_):
         counters = {'timestamp': get_now()}
         for method_name in self.method_names:
             method = getattr(psutil, method_name)
@@ -110,12 +110,12 @@ class PsutilDataRetriever(SampledDataRetriever):
 
 
 class PerformanceCounterRetriever(SampledDataRetriever):
+    JS_DIR_PATH = path.join(path.dirname(__file__), 'js')
 
     def __init__(self, interval=1):
         logger.debug("{}: instantiating".format(self.name))
         self._client = None
-        self.perf_getter_script = read_txt_file(path.join(path.dirname(__file__), 'js',
-                                                          'retrieve_performance_counters.js'))
+        self.perf_getter_script = read_txt_file(path.join(self.JS_DIR_PATH, 'retrieve_performance_counters.js'))
         super(PerformanceCounterRetriever, self).__init__(interval=interval)
 
     @property
@@ -133,19 +133,41 @@ class PerformanceCounterRetriever(SampledDataRetriever):
     def file_name(self):
         return 'ff_perf_counter_sampled_data.json'
 
-    @staticmethod
-    def start_client():
-        logger.info('{}: connecting to Marionette and beginning session')
+    def start_client(self):
+        logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
         client = Marionette('localhost', port=2828)
         client.start_session()
         return client
 
-    def get_counters(self, **kwargs):
+    def get_sample(self, **kwargs):
         with self.client.using_context(self.client.CONTEXT_CHROME):
             counters = {'tabs': self.client.execute_script(self.perf_getter_script),
                         'timestamp': get_now()}
         return counters
 
+
+class PerformanceProcessesRetriever(PerformanceCounterRetriever):
+    """
+    Anything Marionette based needs to be merged into single class due to sampling issues.
+    """
+
+    def __init__(self, interval=1):
+        super(PerformanceProcessesRetriever, self).__init__(interval=interval)
+        self.process_getter_script = read_txt_file(path.join(self.JS_DIR_PATH, 'retrieve_process_info.js'))
+
+    @property
+    def message(self):
+        return '{}: sampling performance and process counters'.format(self.name)
+
+    @property
+    def file_name(self):
+        return 'ff_performance_processes_sampled_data.json'
+
+    def get_sample(self, **kwargs):
+        counters = super(PerformanceProcessesRetriever, self).get_sample(**kwargs)
+        with self.client.using_context(self.client.CONTEXT_CHROME):
+            counters.update({'processes': self.client.execute_script(self.process_getter_script)})
+        return counters
 
 # class WindowsBatteryReportRetriever(SampledDataRetriever):
 #
@@ -176,6 +198,3 @@ class PerformanceCounterRetriever(SampledDataRetriever):
 #
 #     def get_counters(self, **kwargs):
 #         subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
-
-
-

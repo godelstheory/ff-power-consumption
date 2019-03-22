@@ -1,8 +1,8 @@
 import threading
 import time
 import subprocess
-from os import path, chdir, system
-from helpers.io_helpers import make_dir
+from os import path
+from energy_consumption.helpers.io_helpers import make_dir
 
 
 num_seconds = 60
