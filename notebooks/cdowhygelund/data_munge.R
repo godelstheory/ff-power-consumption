@@ -3,7 +3,26 @@ library(lubridate)
 library(stringr)
 library(ggplot2)
 library(plyr)
+library(dplyr)
 library(readr)
+
+
+get_seconds <- function(measures){
+  timestamp <- hms(str_split(ymd_hms(measures[[1]]$timestamp), ' ')[[1]][2])
+  start <- hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp)
+  seconds <- NULL
+  for (measure in measures){
+    timestamp <- hms(str_split(ymd_hms(measure$timestamp), ' ')[[1]][2])
+    seconds <- c(seconds, hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp) - start)
+  }
+  return(seconds)
+}
+
+get_process_data <- function(dir_path){
+  process_data <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
+  names(process_data) <- paste(get_seconds(process_data), 's', sep='')
+  return(process_data)
+}
 
 parse_counters_sum <- function(file_path, exp_bounds){ #, include_addons=FALSE){
   counters <- read_json(file_path)
@@ -130,4 +149,28 @@ remove_bg <- function(df, log){
   model <- lm(Cumulative.Processor.Energy_0.mWh. ~ stopwatch, df[df$seconds<log$seconds, ])
   cleaned <- df$Cumulative.Processor.Energy_0.mWh.- predict(model, df)
   return(cleaned)
+}
+
+get_perf_data <- function(dir_path, exp_bounds = NULL){
+  # get the performance counters
+  counter_file_path <- file.path(dir_path, 'ff_performance_processes_sampled_data.json')
+  # get the battery consumption data
+  ipg_file_path <- list.files(dir_path, pattern='ipg.*_1_.txt', full.names = TRUE)[1]
+  # merge
+  df <- get_data(counter_file_path, ipg_file_path, exp_bounds = exp_bounds)
+  return(df)
+}
+
+# Primary method for importing performance counter and process data
+get_exp_data <- function(dir_path='data/', exp_bounds=NULL){
+  results <- list()
+  for (exp_dir in dir(dir_path, full.names = TRUE)){
+    exp <- basename(exp_dir)
+    url <- str_split(exp, '_2019')[[1]][1]
+    run_id <- length(results[[url]])+1
+    perf <- get_perf_data(exp_dir, exp_bounds)
+    perf$run_id <- run_id
+    results[[url]][[run_id]] <- list(perf=perf, process=get_process_data(exp_dir))
+  }
+  return(results)
 }

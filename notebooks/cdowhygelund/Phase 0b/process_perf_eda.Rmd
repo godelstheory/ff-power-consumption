@@ -11,12 +11,23 @@ output: html_notebook
 
 ```{r}
 source('../data_munge.R')
-file_path <- 'data/exp_bbc_article_20190301_110459/ff_performance_processes_sampled_data.json'
-df <- parse_counters_sum(file_path) #, exp_bounds = c(60, 120))
+df <- get_perf_data('data/exp_lingscars_20190301_115749////', exp_bounds = c(0, 180))  %>%
+  rename(battery_drain = Cumulative.Processor.Energy_0.mWh., `Performance Counts` =  counts) %>%
+  select(stopwatch, battery_drain, `Performance Counts`) %>%
+  gather(metric, measure, -stopwatch)
+# df$seconds <- df$seconds - min(df$seconds)
 ```
 
+
 ```{r}
-plot(df$counts)
+ggplot(df, aes(x=stopwatch, y=measure)) +
+  geom_point(aes(color=metric)) + 
+  facet_grid(rows = vars(metric), scales='free_y') +
+  geom_vline(xintercept=60, linetype='dashed') +
+  geom_vline(xintercept=120, linetype='dashed') +
+  xlab('seconds') + 
+  labs(title='Lingscars') +
+  guides(color=FALSE)
 ```
 
 
@@ -30,12 +41,12 @@ get_exp_data <- function(dir_path, exp_bounds = NULL){
   return(df)
 }
 
-df <- get_exp_data('data/exp_bbc_article_20190301_110459/', exp_bounds = c(70, 120))
+df <- get_exp_data('data/exp_google_20190301_103524//', exp_bounds = c(70, 120))
 ```
 
 
 ```{r}
-plot(df$counts, df$batt_proc_cum)
+plot(x = df$counts, y = df$Cumulative.Processor.Energy_0.mWh.)
 ```
 
 ## Entire Dataset
@@ -185,7 +196,41 @@ Appears to be a new user and kernel, but same pid for each sample
 
 Number of threads
 ```{r}
-sapply(measures, function (x) length(x$processes$process$threads))
+plot(seconds, sapply(measures, function (x) length(x$processes$process$threads)))
+```
+
+Doesn't appear to change much throughout process, though it does follow the experiment changes. 
+
+Let's look at all of the experiments. 
+
+```{r}
+#### DRY: This function is identical for children #### 
+get_threads <- function(measures, idx = 58){
+  # idx = sample to take for additional threads
+  # child = which child process to consider
+  threads <- bind_rows(measures[[idx]]$processes$process$threads)
+  return(threads)
+}
+
+parent_threads <- lapply(results, get_threads)
+
+```
+
+```{r}
+parent_threads$exp_bbc_article_20190301_110459
+```
+
+```{r}
+sapply(parent_threads, function(x) length(which( x$cpuUser>0)))
+```
+
+
+```{r}
+sapply(parent_threads, function(x) nrow(x))
+```
+
+```{r}
+sapply(parent_threads, function(x) sum(x$cpuUser))
 ```
 
 #### Parent Resident Size
@@ -232,7 +277,26 @@ Number of children
 ```{r}
 unique(sapply(measures, function (x) length(x$processes$process$children)))
 ```
+
+```{r}
+tmp[[1]]$processes$process$children
+```
+
+
+
 Interesting this doesn't change throughout the whole experiment, though the number of parent threads does!
+
+Check this is consistent across experiment by finding the total number of children
+
+```{r}
+
+get_child_num <- function(measures){
+  return(sapply(measures[1], function (x) length(x$processes$process$children)))
+}
+any(sapply(results, get_child_num) != 4)
+```
+
+Always 4 child processes throughout whole experiment. 
 
 Number of each childs thread
 ```{r}
@@ -270,7 +334,11 @@ library(ggplot2)
 
 ggplot(nctt, aes(x=seconds, y=num_threads, group=child)) +
   geom_line() + 
-  geom_point(aes(color=child))
+  geom_point(aes(color=child)) + 
+  theme_bw() + 
+  ylab('# of Threads') + 
+  geom_vline(xintercept=60, linetype='dashed') +
+  labs(title = 'Processes: Child Threads')
 ```
 
 Dig into differences in threads between 50 and 75 seconds for Child 3 and Child 4.
@@ -332,6 +400,7 @@ setdiff(unique(after$name), unique(before$name))
 Plot the # of children threads for all experiments
 
 ```{r}
+library(magrittr)
 plot_num_children <- function(dir_path){
   exp <- basename(dir_path)
   measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
@@ -365,13 +434,418 @@ for (dir in dir('data/', full.names = TRUE)){
 ```
 
 
-New York Times and Slate have very similar plots, though very different slopes! Investigate this one further.
+Again, New York Times and Slate have very similar plots, though very different slopes! 
 
+Let's really dig into the differences of the child threads between these two experiments at 75s.
+
+Examine all child thread differences 
+```{r}
+examine_child_threads <- function(exp1, exp2){
+  for (i in 1:4){
+    print(paste('Analyzing child thread:', i))
+    # childid = exp1$measures.75s$processes$process$children[i][[1]]$ChildID
+    r1 <- bind_rows(exp1$measures.75s$processes$process$children[i][[1]]$threads)
+    r2 <- bind_rows(exp2$measures.75s$processes$process$children[i][[1]]$threads)
+    # print(childid)
+    print('Diff 1 -> 2')
+    print(setdiff(unique(r1$name), unique(r2$name)))
+    print('Diff 2 -> 1')
+    print(setdiff(unique(r2$name), unique(r1$name)))
+    print('--------')
+  }
+}
+
+examine_child_threads(results$exp_slate_20190301_120049, results$exp_nytimes_20190301_105852)
+```
+
+`COM MTA` stands out as only difference
+
+Examine Slate 
+
+```{r}
+examine_child_threads(results$exp_slate_20190301_120049, results$exp_lingscars_20190301_104704)
+```
+
+`COM MTA` stands out, again. In addition, a ton of `Media<>` threads
+
+Let's see how CBS pans out, as it has a funny shape (bump at beginning - more threads overall across children 1 and 4), but has low slope.
+
+```{r}
+examine_child_threads(results$exp_slate_20190301_123607, results$exp_cbs_article_20190301_110759)
+```
+
+Crap, it has `COM MTA`, but low slope!
+
+```{r}
+examine_child_threads(results$exp_slate_20190301_120049, results$exp_cbc_article_20190301_121236)
+```
+
+Clearly, this isn't very insightful, though interesting. Let's move onto the other thread information
+
+```{r}
+r1 <- bind_rows(results$exp_slate_20190301_120049$measures.75s$processes$process$children[3][[1]]$threads)
+r2 <- bind_rows(results$exp_nytimes_20190301_105852$measures.76s$processes$process$children[3][[1]]$threads)
+r3 <- bind_rows(results$exp_cbs_article_20190301_110759$measures.76s$processes$process$children[3][[1]]$threads)
+r4 <- bind_rows(results$exp_lingscars_20190301_104704$measures.75s$processes$process$children[3][[1]]$threads)
+
+# print(c(kernel=sum(r1$cpuKernel), user=sum(r1$cpuUser)))
+# print(c(kernel=sum(r2$cpuKernel), user=sum(r2$cpuUser)))
+```
+
+
+```{r}
+r2
+```
+
+```{r}
+r3
+```
+
+```{r}
+r4
+```
+
+It appears that more threads have non-zero values for NYT and Lingscars than for CBS. Let's get some metrics for "active" thread count.
+
+```{r}
+# for (result in results){
+#   print(names(result)[58])
+# }
+
+get_child_threads <- function(measures, idx = 58, child = 3){
+  # idx = sample to take for additional threads
+  # child = which child process to consider
+  threads <- bind_rows(measures[[idx]]$processes$process$children[[child]]$threads)
+  threads$child <- child
+  return(threads)
+}
+
+get_all_child_threads <- function(measures, idx=58){
+  child_threads <- NULL
+  for(child in 1:4){
+    child_threads <- rbind(child_threads, get_child_threads(measures, child=child))
+  }
+  return(child_threads)
+}
+child_threads <- lapply(results, get_all_child_threads)
+```
+
+```{r}
+child_threads$exp_bbc_article_20190301_110459
+```
+
+
+Lets get the non-zero `cpuKernel`, `cpuUser` and combined counts:
+
+`cpuKernel`
+```{r}
+# length(which(child_threads$exp_bbc_article_20190301_110459$cpuKernel > 0))
+sapply(child_threads, function(x) length(which(x$cpuKernel>0)))
+```
+
+`cpuUser`
+```{r}
+sapply(child_threads, function(x) length(which(x$cpuUser>0)))
+```
+
+Both
+```{r}
+sapply(child_threads, function(x) length(which(x$cpuUser>0 | x$cpuKernel>0)))
+```
+
+Unique non-zero threads
+```{r}
+sapply(child_threads, function(x) unique(x$name[x$cpuKernel>0]))
+```
+
+
+**Tarek**: `cpuUser` and `cpuKernel`: "time spent in nanoseconds by this thread in CPU time"
+Let's treat this like it is a scheduler count, and difference from the start of the experiment
+
+```{r}
+threads = list() # names is tid
+df <- NULL
+for(i in 1:length(measures)){
+  measure = measures[[i]]
+  for (thread in measure$processes$process$children[[3]]$thread){
+    # threads[[as.character(thread$tid)]][[as.character(seconds[i])]] <- c(cpuUser = thread$cpuUser, cpuKernel = thread$cpuKernel) #, name=thread$name)
+    df <- rbind(df, c(unlist(thread), second=seconds[i]))
+  }
+}
+# as.character(thread$tid)
+
+length(threads)
+```
+
+
+```{r}
+child.df<- df %>% data.frame(stringsAsFactors = FALSE) %>%
+  mutate_at(.vars = vars(cpuKernel, cpuUser, second), .funs= funs(as.numeric)) %>%
+  arrange(second) %>%
+  gather("type", "measure", -tid, -second, -name)
+
+```
+
+#### Plots for Tarek
+```{r}
+c_plots <- list()
+for (tid in unique(child.df$tid)){
+  c.df <- child.df[child.df$tid == tid, ]
+  name <- unique(c.df$name)[1]
+  if (name == "") name <- "NOT NAMED"
+  p <- ggplot(c.df, aes(x=second, y=measure, group=type)) + 
+    geom_line() + 
+    geom_point(aes(color=type)) + 
+    theme_bw() +
+    labs(title=name)  + 
+    geom_vline(xintercept = 60, linetype = "dashed", color = "red")
+    # annotate("text", label = "Navigate", x = 60, y = 0)
+    # guides(color=FALSE)
+  p 
+  c_plots[[tid]] <- p
+  # print(p)
+}
+```
+
+```{r}
+for (tid in unique(child.df$tid)){
+  c.df <- child.df[child.df$tid == tid, ]
+  diff <- c.t[c.t$tid == tid, ]
+  name <- unique(c.df$name)[1]
+  if (name == "") name <- "NOT NAMED"
+  p1 <- ggplot(c.df, aes(x=second, y=measure, group=type)) + 
+    geom_line() + 
+    geom_point(aes(color=type)) + 
+    theme_bw() +
+    labs(title=name)  + 
+    # geom_vline(xintercept = 60, linetype = "dashed", color = "red") + 
+    # annotate("text", label = "Navigate", x = 60, y = 0)
+    guides(color=FALSE)
+  p2 <- ggplot(diff, aes(x=second, y=delta, group=type)) + 
+    geom_line() + 
+    geom_point(aes(color=type)) + 
+    theme_bw() +
+    labs(title=name)  + 
+    # geom_vline(xintercept = 60, linetype = "dashed", color = "red") + 
+    guides(color=FALSE)
+  # c_plots[[tid]] <- p
+  # print()
+  c_plots[[tid]] <- plot_grid(p1, p2)
+}
 
 ```
 
 
-**Difference the additional thread names**
+```{r}
+library(gridExtra)
+
+pdf("lingscars_child_threads.pdf", onefile = TRUE)
+for(p in c_plots){
+  print(p)
+}
+dev.off()
+```
+
+* New threads are kicking in at right time.
+* These are increasing through the windows of demand
+
+Calculate a thread difference
+
+```{r}
+library(lubridate)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(jsonlite)
+library(cowplot)
+
+
+get_exp <- function(dir_path='data/'){
+  results <- list()
+  for (dir in dir(dir_path, full.names = TRUE)){
+    exp <- basename(dir)
+    results[[exp]] <- read_json(file.path(dir, 'ff_performance_processes_sampled_data.json'))
+  }
+  return(results)
+}
+
+get_seconds <- function(measures){
+  # Extracts the experiment time for each sample from the measures
+  # Args:
+  #   measures: list of experimental run results. returned from jsonlite::read_json(<exp file>)
+  # Returns: 
+  #   Vector of integer seconds of experimental run (0 corresponds to start)
+  timestamp <- hms(str_split(ymd_hms(measures[[1]]$timestamp), ' ')[[1]][2])
+  start <- hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp)
+  seconds <- NULL
+  for (measure in measures){
+    timestamp <- hms(str_split(ymd_hms(measure$timestamp), ' ')[[1]][2])
+    seconds <- c(seconds, hour(timestamp)*60*60 + minute(timestamp)*60 + second(timestamp) - start)
+  }
+  return(seconds)
+}
+
+build_child_threads_df <- function(measures){
+  # Builds a dataframe of the child threads throughout the experiment
+  # Args:
+  #   measures: list of experimental run results. returned from jsonlite::read_json(<exp file>)
+  # Returns: 
+  #   data.frame of child threads. columns: type (cpuKernel or cpuUser), measure (reported value), second, tid, name
+  seconds <- get_seconds(measures)
+  df <- NULL
+  for(i in 1:length(measures)){
+    measure = measures[[i]]
+    df <- rbind(df, t(sapply(measure$processes$process$children[[3]]$thread, function(x) c(unlist(x), second=seconds[i]))))
+    }
+  
+  df <- df %>%
+    data.frame(stringsAsFactors = FALSE) %>%
+    mutate_at(.vars = vars(cpuKernel, cpuUser, second), .funs= funs(as.numeric)) %>%
+    arrange(second) %>%
+    gather("type", "measure", -tid, -second, -name)
+  return(df)
+}
+
+calc_diff <- function(x){
+  delta <- diff(x$measure)
+  time <- x$second[2:nrow(x)]
+  name <- unique(x$name)[1]
+  if (length(time) != length(delta)) 
+    df <- data.frame(delta=as.numeric(), second=as.numeric(), name=character(), stringsAsFactors = FALSE)
+  else 
+    df <- data.frame(delta=delta, second=time, name = name, stringsAsFactors = FALSE)
+  return(df)
+  }
+
+calc_thread_diff <- function(df){
+  # Calculates the difference between each sample of a child thread 
+  # Args:
+  #   measures: data.frame returned by `build_chlid_threads_df`
+  # Returns: 
+  #   data.frame of child threads. columns: type (cpuKernel or cpuUser), measure (reported value), second, tid, name
+  df %>%
+    group_by(tid, type) %>%
+    do(calc_diff(.)) -> c.diff
+  return(c.diff)
+}
+
+plot_child_thread <- function(df, df.diff){
+  name <- unique(df$name)[1]
+  if (name == "") name <- "NOT NAMED"
+  p1 <- ggplot(df, aes(x=second, y=measure, group=type)) + 
+    geom_line() + 
+    geom_point(aes(color=type)) + 
+    theme_bw() +
+    labs(title=name)  + 
+    # geom_vline(xintercept = 60, linetype = "dashed", color = "red") + 
+    # annotate("text", label = "Navigate", x = 60, y = 0)
+    guides(color=FALSE)
+  p2 <- ggplot(df.diff, aes(x=second, y=delta, group=type)) + 
+    geom_line() + 
+    geom_point(aes(color=type)) + 
+    theme_bw() +
+    labs(title=name)  + 
+    # geom_vline(xintercept = 60, linetype = "dashed", color = "red") + 
+    guides(color=FALSE)
+  # c_plots[[tid]] <- p
+  # print()
+  return(plot_grid(p1, p2))
+}
+
+sum_child_threads <- function(df){
+  ### HACK!!! replace negatives with 0  ### 
+  df %>% 
+    mutate(delta=replace(delta, delta<0, 0)) %>%
+    group_by(tid, type, name) %>%
+    summarise(sum = sum(delta)) -> result
+  return(result)
+}
+```
+
+
+Let's look at NYT and Slate
+
+```{r}
+measures.nyt <- read_json('data/exp_nytimes_20190301_105852//ff_performance_processes_sampled_data.json')
+c.t.nyt <- build_child_threads_df(measures.nyt)
+c.t.nyt.diff <- calc_thread_diff(c.t.nyt)
+
+measures.slate <- read_json('data/exp_slate_20190301_120049/ff_performance_processes_sampled_data.json')
+c.t.slate <- build_child_threads_df(measures.slate)
+c.t.slate.diff <- calc_thread_diff(c.t.slate)
+
+measures.lings <- read_json('data/exp_lingscars_20190301_104704/ff_performance_processes_sampled_data.json')
+c.t.lings <- build_child_threads_df(measures.lings)
+c.t.lings.diff <- calc_thread_diff(c.t.lings)
+
+
+```
+
+```{r}
+# for (tid in unique(c.t.nyt$tid)){
+#   print(plot_child_thread(c.t.nyt[c.t.nyt$tid==tid, ], c.t.nyt.diff[c.t.nyt.diff$tid==tid, ]))
+# }
+```
+
+
+Let's sum all the threads to see how things change.
+
+```{r}
+c.t.nyt.sum <- sum_child_threads(c.t.nyt.diff)
+c.t.slate.sum <- sum_child_threads(c.t.slate.diff)
+c.t.lings.sum <- sum_child_threads(c.t.lings.diff)
+c.t.slate.sum$url <- 'slate'
+c.t.nyt.sum$url <- 'nyt'
+c.t.lings.sum$url <- 'lings'
+c.t.sum <- rbind(c.t.nyt.sum, c.t.slate.sum, c.t.lings.sum)
+
+```
+
+net sum
+```{r}
+c.t.sum %>%
+  group_by(type, url) %>%
+  summarise(sum = sum(sum))
+```
+
+Filter out unnamed
+```{r}
+c.t.sum %>%
+  filter(name != "") %>%
+  group_by(type, url) %>%
+  summarise(sum = sum(sum))
+```
+
+
+```{r}
+diffs <- list()
+# measures <- read_json(file.path(dir_path, 'ff_performance_processes_sampled_data.json'))
+for (exp in names(results)){
+  measures <- results[[exp]]
+  c.t <- build_child_threads_df(measures)
+  c.t.diff <- calc_thread_diff(c.t)
+  c.t.diff$url <- exp
+  diffs[[exp]] <- c.t.diff
+  }
+```
+
+```{r}
+diff.df <- bind_rows(diffs)
+diff.df %>%
+  group_by(type, url) %>%
+  do(sum_child_threads(.)) %>%
+  group_by(type, url, name) %>%
+  summarise(sum = sum(sum)) %>%
+  arrange(name, -sum)
+
+```
+
+
+
+** Threads next steps **
+2. Compare threads of like type between Slate and NYT: look at slopes!
+3. replace negatives, with the original value (assuming starting at 0)
+
 
 
 **ResidentSetSize for children threads?**
