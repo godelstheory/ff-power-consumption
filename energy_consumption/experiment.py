@@ -2,7 +2,6 @@ import abc
 import glob
 import json
 import logging
-import subprocess
 import sys
 import time
 import traceback
@@ -33,33 +32,17 @@ class ExperimentMeta(NameMixin):
     def exp_name(self):
         return self.__exp_name
 
-    @exp_name.setter
-    def exp_name(self, _):
-        raise AttributeError('{}: exp_name cannot be manually set'.format(self.name))
-
     @property
     def exp_dir_path(self):
         return self.__exp_dir_path
-
-    @exp_dir_path.setter
-    def exp_dir_path(self, _):
-        raise AttributeError('{}: exp_dir_path cannot be manually set'.format(self.name))
 
     @property
     def perf_counter_file_path(self):
         return path.join(self.__exp_dir_path, '{}_{}_perf_counters.json'.format(self.exp_name, self.exp_id))
 
-    @perf_counter_file_path.setter
-    def perf_counter_file_path(self, _):
-        raise AttributeError('{}: perf_counter_file_path cannot be manually set'.format(self.name))
-
     @property
     def experiment_file_path(self):
         return path.join(self.exp_dir_path, '{}_{}_experiment.json'.format(self.exp_name, self.exp_id))
-
-    @experiment_file_path.setter
-    def experiment_file_path(self, _):
-        raise AttributeError('{}: experiment_file_path cannot be manually set'.format(self.name))
 
 
 class Experiment(ExperimentMeta):
@@ -99,17 +82,9 @@ class Experiment(ExperimentMeta):
     def results(self):
         return self.__results
 
-    @results.setter
-    def results(self, value):
-        raise AttributeError('{}: results cannot be manually set'.format(self.name))
-
     @property
     def tasks(self):
         return self.__tasks
-
-    @tasks.setter
-    def tasks(self, value):
-        raise AttributeError('{}: tasks cannot be manually set'.format(self.name))
 
     @property
     def ipg_results_path(self):
@@ -119,13 +94,11 @@ class Experiment(ExperimentMeta):
     def ipg_results_path(self, _):
         raise AttributeError('{}: ipg_file_path cannot be manually set'.format(self.name))
 
-    # @staticmethod
     def start_client(self):
         logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
         client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(),
                             prefs={"browser.tabs.remote.autostart": True},
                             gecko_log='-')
-        # client = Marionette('localhost', port=2828)
         client.start_session()
         return client
 
@@ -141,9 +114,6 @@ class Experiment(ExperimentMeta):
 
     def initialize(self, **kwargs):
         logger.debug('{}: initializing experiment'.format(self.name))
-        # start Firefox in Marionette mode subprocess
-        # if kwargs.get('start_ff', True):
-        #     self.__ff_process = subprocess.Popen([self.__ff_exe_path, '--marionette'])
         # Initialize client on tasks
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting sampled data streams (e.g., performance counters, psutil)
@@ -216,10 +186,6 @@ class Experiment(ExperimentMeta):
         self.clean_ipg_file()
         # Stop Marionette and Firefox
         self.tasks.client.quit(in_app=True)
-        # kill the Firefox subprocess
-        # if self.__ff_process is not None:
-        # kill_proc_tree(self.__ff_process.pid)
-        # self.__ff_process.terminate()
 
 
 class Tasks(NameMixin):
@@ -270,17 +236,9 @@ class Task(NameMixin):
     def client(self):
         return self.__client
 
-    @client.setter
-    def client(self, _):
-        raise AttributeError('{}: client cannot be manually set'.format(self.name))
-
     @property
     def meta(self):
         return self.__meta
-
-    @meta.setter
-    def meta(self, _):
-        raise AttributeError('{}: meta cannot be manually set'.format(self.name))
 
     @property
     def task(self):
@@ -309,7 +267,6 @@ class Task(NameMixin):
             result['meta']['error'] = exp
             raise e
         return result
-
 
 # FIXME: Not supported under changes with battery consumption work. Needs lots of love to work!
 # class PlugLoadExperiment(ExperimentMeta):
@@ -469,4 +426,3 @@ class Task(NameMixin):
 #         self.serialize()
 #         # kill the Firefox subprocess
 #         self.__ff_process.terminate()
-
