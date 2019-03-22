@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import json
-import logging
 import subprocess
 import sys
 from os.path import join
@@ -14,7 +13,7 @@ from energy_consumption.experiment import ExperimentMeta
 #     PerformanceCounterTask, get_now)
 from energy_consumption.performance_counter import (
     PsUtilTask, get_now)
-from helpers.io_helpers import make_dir
+from energy_consumption.helpers.io_helpers import make_dir
 
 from structlog import get_logger; logger = get_logger()
 

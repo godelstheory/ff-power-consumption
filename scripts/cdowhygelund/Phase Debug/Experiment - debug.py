@@ -1,6 +1,6 @@
 from os import path
 
-from helpers.io_helpers import log_to_stdout
+from energy_consumption.helpers.io_helpers import log_to_stdout
 import logging
 from energy_consumption.experiment import Tasks, Task, Experiment
 from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever

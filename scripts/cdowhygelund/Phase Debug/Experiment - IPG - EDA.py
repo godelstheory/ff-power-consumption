@@ -2,7 +2,7 @@ import logging
 
 from os import path
 from energy_consumption.experiment import Experiment, Tasks, Task
-from helpers.io_helpers import log_to_stdout
+from energy_consumption.helpers.io_helpers import log_to_stdout
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
