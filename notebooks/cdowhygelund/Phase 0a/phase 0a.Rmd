@@ -19,7 +19,7 @@ A suite of experiments were performed, which only differed on website
 5. Stop experiment
 
 ```{r echo=FALSE, message=FALSE}
-source('data_munge.R')
+source('../data_munge.R')
 ```
 
 ```{r echo=FALSE}
