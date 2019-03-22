@@ -1,14 +1,11 @@
 import abc
 import json
-# import lxml
-# import subprocess
 import threading
 import time
 from datetime import datetime
 from os import path
 
 import psutil
-# from structlog import get_logger
 import logging
 
 from marionette_driver.marionette import Marionette
@@ -92,7 +89,6 @@ class PsutilDataRetriever(SampledDataRetriever):
 
     @staticmethod
     def gen_cpu_stat_names(method_names=('cpu_stats', 'cpu_times')):
-        "Some of these are platform-dependent"
         dct = {}
         for method_name in method_names:
             method = getattr(psutil, method_name)
