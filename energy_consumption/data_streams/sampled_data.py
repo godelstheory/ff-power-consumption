@@ -4,8 +4,8 @@ import subprocess
 import threading
 import time
 from datetime import datetime
-from os import path
-import xml.etree.ElementTree as ET
+from os import path, devnull
+import xml.etree.ElementTree as Et
 
 import psutil
 import logging
@@ -187,17 +187,15 @@ class WindowsBatteryReportRetriever(SampledDataRetriever):
         return self.__file_name
 
     def get_sample(self, **_):
-        subprocess.check_call(['powercfg', '/batteryreport', '/duration', str(self.interval),
-                               '/output', self.br_file_name, '/xml'])
+        with open(devnull, 'w') as fnull:  # Suppress annoying windows messages
+            subprocess.check_call(['powercfg', '/batteryreport', '/duration', str(self.interval),
+                                   '/output', self.br_file_name, '/xml'], stdout=fnull)
         # read in the xml and pull out the relevant measures
         xml_string = read_txt_file(self.br_file_name)
-        root = ET.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
+        root = Et.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
         elem = root.find('RecentUsage/UsageEntry[@EntryType="ReportGenerated"]')
         results = {x: elem.attrib[x] if not elem.attrib[x].isdigit() else int(elem.attrib[x])
                    for x in ('FullChargeCapacity', 'ChargeCapacity', 'Timestamp')}
         # delete the xml file
         delete_file(self.br_file_name)
         return results
-
-
-
