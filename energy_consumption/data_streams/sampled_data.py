@@ -5,13 +5,14 @@ import threading
 import time
 from datetime import datetime
 from os import path
+import xml.etree.ElementTree as ET
 
 import psutil
 import logging
 
 from marionette_driver.marionette import Marionette
 
-from energy_consumption.helpers.io_helpers import read_txt_file, get_temp_filename
+from energy_consumption.helpers.io_helpers import read_txt_file, get_temp_filename, delete_file
 from mixins import NameMixin
 
 logger = logging.getLogger(__name__)
@@ -175,23 +176,26 @@ class WindowsBatteryReportRetriever(SampledDataRetriever):
 
     @property
     def file_name(self):
-        self.__file_name = 'wbr.xml'
-        # if self.file_name is None:
-        #     self.__file_name = get_temp_filename(None)
+        # self.__file_name = 'wbr.xml'
+        if self.file_name is None:
+            self.__file_name = get_temp_filename(None)
         return self.__file_name
 
     @property
     def message(self):
         return '{}: sampling Windows Battery Report'.format(self.name)
 
-    def get_battery_report(self, i):
-        batt_rep_file_path = path.join(self.output_dir_path, 'batter_report_{}.xml'.format(i))
-
     def get_sample(self, **_):
-        """ Does all the work on sampling"""
-        self.get_counters()
-        return {}
-
-    def get_counters(self, **kwargs):
         subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
+        # read in the xml and pull out the relevant measures
+        xml_string = read_txt_file(self.file_name)
+        root = ET.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
+        elem = root.find('RecentUsage/UsageEntry[@EntryType="ReportGenerated"]')
+        results = {x: elem.attrib[x] if not elem.attrib[x].isdigit() else int(elem.attrib[x])
+                   for x in ('FullChargeCapacity', 'ChargeCapacity', 'Timestamp')}
+        # delete the xml file
+        delete_file(self.file_name)
+        return results
+
+
 
