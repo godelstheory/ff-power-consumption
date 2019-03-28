@@ -172,22 +172,23 @@ class WindowsBatteryReportRetriever(SampledDataRetriever):
 
     def __init__(self, interval=1):
         super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
-        self.__file_name = None
+        self.__file_name = get_temp_filename(None)
 
     @property
     def file_name(self):
-        # self.__file_name = 'wbr.xml'
-        if self.file_name is None:
-            self.__file_name = get_temp_filename(None)
-        return self.__file_name
+        return 'windows_battery_report_sampled_data.json'
 
     @property
     def message(self):
         return '{}: sampling Windows Battery Report'.format(self.name)
 
+    @property
+    def br_file_name(self):
+        return self.__file_name
+
     def get_sample(self, **_):
         subprocess.check_call(['powercfg', '/batteryreport', '/duration', str(self.interval),
-                               '/output', self.file_name, '/xml'])
+                               '/output', self.br_file_name, '/xml'])
         # read in the xml and pull out the relevant measures
         xml_string = read_txt_file(self.file_name)
         root = ET.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
@@ -195,7 +196,7 @@ class WindowsBatteryReportRetriever(SampledDataRetriever):
         results = {x: elem.attrib[x] if not elem.attrib[x].isdigit() else int(elem.attrib[x])
                    for x in ('FullChargeCapacity', 'ChargeCapacity', 'Timestamp')}
         # delete the xml file
-        delete_file(self.file_name)
+        delete_file(self.br_file_name)
         return results
 
 
