@@ -186,7 +186,8 @@ class WindowsBatteryReportRetriever(SampledDataRetriever):
         return '{}: sampling Windows Battery Report'.format(self.name)
 
     def get_sample(self, **_):
-        subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
+        subprocess.check_call(['powercfg', '/batteryreport', '/duration', str(self.interval),
+                               '/output', self.file_name, '/xml'])
         # read in the xml and pull out the relevant measures
         xml_string = read_txt_file(self.file_name)
         root = ET.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
