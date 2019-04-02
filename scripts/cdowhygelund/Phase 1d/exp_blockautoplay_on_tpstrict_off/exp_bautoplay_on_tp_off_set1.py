@@ -54,7 +54,9 @@ def run_exp(exp_id, uri):
     exp = Experiment(
         exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=150,
         sampled_data_retrievers=(sd.PerformanceProcessesRetriever(), sd.PsutilDataRetriever(),
-                                 sd.WindowsBatteryReportRetriever())
+                                 sd.WindowsBatteryReportRetriever()),
+        prefs={'privacy.trackingprotection.enabled': False,
+               "media.autoplay.default": 1}
     )
 
     exp.run(wait_interval=10)
