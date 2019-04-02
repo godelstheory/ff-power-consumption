@@ -77,6 +77,7 @@ class Experiment(ExperimentMeta):
         self.duration = kwargs.get('duration', 60)
         self.start_time = None
         self.sampled_data_retrievers = sampled_data_retrievers or (PerformanceCounterRetriever(),)
+        self.prefs = kwargs.get('prefs', {})
 
     @property
     def results(self):
@@ -96,8 +97,9 @@ class Experiment(ExperimentMeta):
 
     def start_client(self):
         logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
-        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(),
-                            prefs={"browser.tabs.remote.autostart": True},
+        exp_prefs = {"browser.tabs.remote.autostart": True}  # required for measuring child processes
+        exp_prefs.update(self.prefs)
+        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(), prefs=exp_prefs,
                             gecko_log='-')
         client.start_session()
         return client
