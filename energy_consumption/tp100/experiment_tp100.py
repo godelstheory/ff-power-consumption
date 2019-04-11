@@ -32,5 +32,7 @@ class ExperimentTp100(Experiment):
         elif self.plug.is_on:
             self.plug.turn_off()
 
+        super(ExperimentTp100, self).run(**kwargs)
+
 
 
