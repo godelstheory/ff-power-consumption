@@ -1077,10 +1077,10 @@ class SmartPlug(SmartDevice):
 #
 #
 
-plug_atts = Discover.discover().values()[0]
-plug = SmartPlug(plug_atts.host)
-
-if plug.is_off:
-    plug.turn_on()
-elif plug.is_on:
-    plug.turn_off()
+# plug_atts = Discover.discover().values()[0]
+# plug = SmartPlug(plug_atts.host)
+#
+# if plug.is_off:
+#     plug.turn_on()
+# elif plug.is_on:
+#     plug.turn_off()
