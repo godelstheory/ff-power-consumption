@@ -144,17 +144,30 @@ get_perf_data <- function(dir_path, exp_bounds = NULL){
   return(df)
 }
 
+merge_perf_data <- function(exps){
+  perf_merged <- list()
+  for (exp in names(exps)){
+    df <- exps[[exp]] %>%
+      lapply(function(x) x$perf) %>%
+      bind_rows() %>%
+      add_column(exp = exp) %>% 
+      rename(battery_drain = Cumulative.Processor.Energy_0.mWh.) %>%
+      mutate(run_id = as.factor(run_id))
+    perf_merged[[exp]] <- df
+  }
+  return(perf_merged)
+}
+
 # Primary method for importing performance counter and process data
 get_exp_data <- function(dir_path='data/', exp_bounds=NULL){
   results <- list()
-  for (exp_dir in dir(dir_path, full.names = TRUE)){
+  for (exp_dir in list.dirs(dir_path, full.names = TRUE, recursive=FALSE)){
     exp <- basename(exp_dir)
     url <- str_split(exp, '_2019')[[1]][1]
     run_id <- length(results[[url]])+1
     perf <- get_perf_data(exp_dir, exp_bounds)
     perf$run_id <- run_id
     results[[url]][[run_id]] <- list(perf=perf, process=get_process_data(exp_dir))
-    break
   }
   return(results)
 }
