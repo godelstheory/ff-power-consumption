@@ -29,7 +29,7 @@ class ExperimentTp100(Experiment):
             if self.plug.is_off:  # ensure it is on
                 self.plug.turn_on()
             while battery.percent < self.battery_thresh[1]:  # charge until maximum met
-                time.sleep(3000)  # wait 5 minutes
+                time.sleep(300)  # wait 5 minutes
                 battery = psutil.sensors_battery()
             # turn off the plug
             end_charging = time.clock()
