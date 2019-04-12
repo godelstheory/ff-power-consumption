@@ -11,7 +11,7 @@ class ExperimentTp100(Experiment):
     def __init__(self, exp_id, exp_name, tasks, sampled_data_retrievers=None, **kwargs):
         super(ExperimentTp100, self).__init__(exp_id, exp_name, tasks=tasks,
                                               sampled_data_retrievers=sampled_data_retrievers, **kwargs)
-        self.battery_thresh = kwargs.get('battery_thresh', (0.1, 0.95))  # battery threshold to turn off plug
+        self.battery_thresh = kwargs.get('battery_thresh', (10, 95))  # % battery threshold to turn off plug
         # Get connection to tp100
         plugs = tp100.Discover.discover().values()
         self._plug = None if not plugs else tp100.SmartPlug(plugs[0].host)
