@@ -3,7 +3,7 @@ from os import path
 from energy_consumption.helpers.io_helpers import log_to_stdout
 import logging
 from energy_consumption.experiment import Tasks, Task, Experiment
-import energy_consumption.data_streams.sampled_data as sd
+from energy_consumption.data_streams.sampled_data import PerformanceCounterRetriever, PsutilDataRetriever
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -30,8 +30,7 @@ class TasksDebug(Tasks):
 
 
 exp_name = path.splitext(path.basename(__file__))[0]
-sampled_data_retrievers = (sd.PerformanceProcessesRetriever(), sd.PsutilDataRetriever(),
-                           sd.WindowsBatteryReportRetriever())
+sampled_data_retrievers = (PerformanceCounterRetriever(), PsutilDataRetriever())
 exp = Experiment(exp_id=exp_id, exp_name=exp_name, tasks=TasksDebug(), duration=60,
                  sampled_data_retrievers=sampled_data_retrievers)
 

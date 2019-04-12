@@ -77,7 +77,6 @@ class Experiment(ExperimentMeta):
         self.duration = kwargs.get('duration', 60)
         self.start_time = None
         self.sampled_data_retrievers = sampled_data_retrievers or (PerformanceCounterRetriever(),)
-        self.prefs = kwargs.get('prefs', {})
 
     @property
     def results(self):
@@ -97,9 +96,8 @@ class Experiment(ExperimentMeta):
 
     def start_client(self):
         logger.info('{}: connecting to Marionette and beginning session'.format(self.name))
-        exp_prefs = {"browser.tabs.remote.autostart": True}  # required for measuring child processes
-        exp_prefs.update(self.prefs)
-        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(), prefs=exp_prefs,
+        client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(),
+                            prefs={"browser.tabs.remote.autostart": True},
                             gecko_log='-')
         client.start_session()
         return client
@@ -145,9 +143,8 @@ class Experiment(ExperimentMeta):
             self.finalize(**kwargs)
         except Exception as e:
             logger.error('{}: Experiment failed due to {}\n{}'.format(self.name, e, traceback.format_exc()))
-            with open(path.join(self.exp_dir_path, 'failure.alert'), 'w') as f:
+            with open(path.join(self.exp_dir_path, 'failure.alert')) as f:
                 f.write('Experimental data in this directory could be contaminated!\nUse at own risk!')
-                f.write('{}: {}\n{}'.format(self.name, e, traceback.format_exc()))
 
     def perform_experiment(self, **kwargs):
         self.results.extend(self.tasks.run(**kwargs))

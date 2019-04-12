@@ -21,10 +21,6 @@ def write_txt_file(file_path, txt):
         f.write(txt)
 
 
-def delete_file(file_path):
-    remove(file_path)
-
-
 def unpickle_object(file_path):
     with open(file_path, 'r') as f:
         obj = cPickle.load(f)
