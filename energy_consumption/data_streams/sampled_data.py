@@ -1,18 +1,16 @@
 import abc
 import json
-import subprocess
 import threading
 import time
 from datetime import datetime
-from os import path, devnull
-import xml.etree.ElementTree as Et
+from os import path
 
 import psutil
 import logging
 
 from marionette_driver.marionette import Marionette
 
-from energy_consumption.helpers.io_helpers import read_txt_file, get_temp_filename, delete_file
+from energy_consumption.helpers.io_helpers import read_txt_file
 from mixins import NameMixin
 
 logger = logging.getLogger(__name__)
@@ -167,35 +165,32 @@ class PerformanceProcessesRetriever(PerformanceCounterRetriever):
             counters.update({'processes': self.client.execute_script(self.process_getter_script)})
         return counters
 
-
-class WindowsBatteryReportRetriever(SampledDataRetriever):
-
-    def __init__(self, interval=1):
-        super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
-        self.__file_name = get_temp_filename(None)
-
-    @property
-    def file_name(self):
-        return 'windows_battery_report_sampled_data.json'
-
-    @property
-    def message(self):
-        return '{}: sampling Windows Battery Report'.format(self.name)
-
-    @property
-    def br_file_name(self):
-        return self.__file_name
-
-    def get_sample(self, **_):
-        with open(devnull, 'w') as fnull:  # Suppress annoying windows messages
-            subprocess.check_call(['powercfg', '/batteryreport', '/duration', str(self.interval),
-                                   '/output', self.br_file_name, '/xml'], stdout=fnull)
-        # read in the xml and pull out the relevant measures
-        xml_string = read_txt_file(self.br_file_name)
-        root = Et.fromstring(xml_string.replace('xmlns=\"http://schemas.microsoft.com/battery/2012\"', ''))
-        elem = root.find('RecentUsage/UsageEntry[@EntryType="ReportGenerated"]')
-        results = {x: elem.attrib[x] if not elem.attrib[x].isdigit() else int(elem.attrib[x])
-                   for x in ('FullChargeCapacity', 'ChargeCapacity', 'Timestamp')}
-        # delete the xml file
-        delete_file(self.br_file_name)
-        return results
+# class WindowsBatteryReportRetriever(SampledDataRetriever):
+#
+#     def __init__(self, interval=1):
+#         super(WindowsBatteryReportRetriever, self).__init__(interval=interval)
+#         self.__file_name = None
+#
+#     @property
+#     def message(self):
+#         return '{}: sampling Windows Battery Report'.format(self.name)
+#
+#     def get_battery_report(self, i):
+#         batt_rep_file_path = path.join(self.output_dir_path, 'batter_report_{}.xml'.format(i))
+#
+#
+#     def run(self):
+#         i = 0
+#         while True:
+#             self.get_battery_report(i)
+#             i += 1
+#             time.sleep(self.interval)
+#
+#     @property
+#     def file_name(self):
+#         if self.file_name is None:
+#             self.__file_name = get_temp_filename(None)
+#         return self.__file_name
+#
+#     def get_counters(self, **kwargs):
+#         subprocess.check_call(['powercfg', '/batteryreport', '/duration', 1, '/output', self.file_name, '/xml'])
