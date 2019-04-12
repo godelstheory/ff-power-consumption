@@ -58,7 +58,7 @@ def run_exp(exp_id, uri):
                                  sd.WindowsBatteryReportRetriever()),
         prefs={'privacy.trackingprotection.enabled': False,
                "media.autoplay.default": 0},
-        battery_thresh=(90, 95)
+        battery_thresh=(10, 95)
     )
 
     exp.run(wait_interval=10)
