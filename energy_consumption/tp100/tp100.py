@@ -9,6 +9,9 @@ import warnings
 
 logger = logging.getLogger(__name__)
 
+"""
+Ported to Py2 from https://github.com/GadgetReactor/pyHS100
+"""
 
 class TPLinkSmartHomeProtocol:
     """
