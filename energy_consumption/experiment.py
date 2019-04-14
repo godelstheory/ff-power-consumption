@@ -8,6 +8,7 @@ import traceback
 from os import path, getcwd
 
 from marionette_driver.marionette import Marionette
+from mozversion import mozversion
 
 from energy_consumption.helpers.io_helpers import make_dir
 from mixins import NameMixin
@@ -43,6 +44,10 @@ class ExperimentMeta(NameMixin):
     @property
     def experiment_file_path(self):
         return path.join(self.exp_dir_path, '{}_{}_experiment.json'.format(self.exp_name, self.exp_id))
+
+    @property
+    def ff_property_file_path(self):
+        return path.join(self.exp_dir_path, '{}_{}_ff_props.json'.format(self.exp_name, self.exp_id))
 
 
 class Experiment(ExperimentMeta):
@@ -114,8 +119,15 @@ class Experiment(ExperimentMeta):
             raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
         return ff_exe_path
 
+    def serialize_ff_properties(self):
+        props = mozversion.get_version(self.get_ff_default_path())
+        with open(self.ff_property_file_path, 'w') as f:
+            json.dump(props, f, indent=4, sort_keys=True)
+
     def initialize(self, **kwargs):
         logger.debug('{}: initializing experiment'.format(self.name))
+        # save off FF properties (version, build, etc...)
+        self.serialize_ff_properties()
         # Initialize client on tasks
         self.tasks.client = self.start_client()
         # connect to Firefox, begin collecting sampled data streams (e.g., performance counters, psutil)
