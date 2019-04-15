@@ -75,6 +75,11 @@ parse_log <- function(file_path){
   return(log) 
 }
 
+parse_ff_prop <- function(file_path){
+  props <- read_json(file_path)
+  
+}
+
 parse_psutil <- function(file_path, tz='US/Pacific'){
   metrics <- read_json(file_path)
   metrics[[1]] <- NULL
@@ -162,6 +167,10 @@ merge_perf_data <- function(exps){
 get_exp_data <- function(dir_path='data/', exp_bounds=NULL){
   results <- list()
   for (exp_dir in list.dirs(dir_path, full.names = TRUE, recursive=FALSE)){
+    if (file.exists(file.path(exp_dir, 'failure.alert'))){
+      warning(paste('Disregarding experiment due to reported failure:', exp_dir))
+      next
+    }
     exp <- basename(exp_dir)
     url <- str_split(exp, '_2019')[[1]][1]
     run_id <- length(results[[url]])+1
