@@ -1,0 +1,241 @@
+---
+title: 'Battery Consumption: Comparison of Software Measures'
+author: "Corey Dow-Hygelund, Mozilla Data Science"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+The current experimentation process utilizes _Intel Power Gadget_ (IPG) to measure battery consumption using `Processor Energy` as a proxy. This is due to _Intel Power Gadget_ having sufficient resolution and being cross-platform. This analysis is intended to determine the validity of such an proxy, measuring battery usage utilizing the Windows specific _Battery Report_ in addition to the `psutil` Python library. A range of websites are tested to determine influential factors, such as GPU usage in video.
+
+```{r, message=FALSE, echo=FALSE}
+library(tibble)
+library(knitr)
+source('../../data_munge.R')
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+# Overrride existing method in data_munge.R to organize baseed upon timestamps, rather than URI
+
+get_exp_data <- function(dir_path='data/', exp_bounds=NULL){
+  results <- list()
+  for (exp_dir in list.dirs(dir_path, full.names = TRUE, recursive=FALSE)){
+    # bail if errors reported (i.e., failure.alert file)
+    if (file.exists(file.path(exp_dir, 'failure.alert'))){
+      warning(paste('Disregarding experiment due to reported failure:', exp_dir))
+      next
+    }
+    exp <- basename(exp_dir)
+    timestamp <- str_split(exp, '_2019')[[1]][2] # Retrieve the timestamp and utilize for run ID
+    perf <- get_perf_data(exp_dir, exp_bounds)
+    perf$exp <- timestamp
+    results[[timestamp]] <- perf  # , process=get_process_data(exp_dir))
+  }
+  return(results)
+}
+
+exps <- get_exp_data('data/exp_blockautoplay_on_single_exp_tp100/')
+```
+
+```{r, echo=FALSE}
+exps_df <- bind_rows(exps)
+```
+
+```{r, echo=FALSE}
+# Check out the platform, build, etc... across runs
+
+exp_props <- list()
+ for (exp_dir in list.dirs('data/exp_blockautoplay_on_single_exp_tp100/', full.names = TRUE, recursive=FALSE)){
+    prop_file_path <- list.files(exp_dir, pattern='*_props.json', full.names = TRUE)[1]
+    exp <- basename(exp_dir)
+    timestamp <- str_split(exp, '_2019')[[1]][2] # Retrieve the timestamp and utilize for run ID
+    props <- as.data.frame(read_json(prop_file_path), stringsAsFactors = FALSE)
+    props$exp <- timestamp
+    exp_props[[exp_dir]] <- props
+ }
+
+props_df <- exp_props %>% bind_rows()
+```
+
+# Summary
+
+* IPG is an effective proxy for measure battery usage. 
+* However, there are effects related battery level, that can influence the relationship by up to ~15%.
+   - This is observed for both `psutil` and Battery Report
+   - As the battery level decreases, the measured powered usage relates to higher battery usage. 
+* Battery Report can measure lower battery levels than `psutil`. 
+
+# Description
+A total of `r length(exps)` runs were performed across two days. Each run was composed of navigating to 22 different urls in the following fashion:
+
+1. navigate to `about:blank`
+2. sleep for 30 seconds
+3. navigate to desired url
+4. sleep for 60 seconds
+
+The order of 22 urls were shuffled between runs. 
+
+At the end of the run, the battery level was checked by `psutil`. If it fell below 40%, the experiment was paused, while the Tp100 smartplug was turned on to charge the laptop. Once it reached 98%, the experiment was resumed. 
+
+# Windows Battery Report and IPG
+Examine the Windows Battery Report versus IPG reported energy usage across the run.
+
+## Single Run
+Plotting a single run, in addition to a linear model fit.
+
+```{r, echo=FALSE}
+ggplot(exps[["0414_183804"]], aes(Cumulative.Processor.Energy_0.mWh., level)) + 
+  geom_point(aes(color = exp), size = 0.2)  + 
+  geom_smooth(method='lm', aes(color = exp)) +
+  xlab('IPG: Cumulative Power Usage (mWh)') + 
+  ylab('Windows Battery Report: battery %') + 
+  guides(color=FALSE) + 
+  theme_bw()
+```
+
+The poor resolution of battery report is evident. Fortunately, IPG measured power usage linearly maps to battery consumption. 
+
+## All Runs
+
+Plotting all runs to see if there is any change of the observation above. 
+
+```{r, echo=FALSE}
+ggplot(exps_df, aes(Cumulative.Processor.Energy_0.mWh., level)) + 
+  geom_point(aes(color = exp), size = 0.2)  + 
+  geom_smooth(method='lm', aes(color = exp)) + 
+  xlab('IPG: Cumulative Power Usage (mWh)') + 
+  ylab('Windows Battery Report: battery %') + 
+  # guides(color=FALSE) + 
+  theme_bw()
+```
+
+An interesting observation is that the slopes do not appear entitely consistent across runs. The run corresponding to the lowest battery level `(green, 0414_183804)`, appears steeper than the one above it. 
+
+## Relationship
+
+Calculating the slope of the relationship for each run:
+
+```{r, echo=FALSE}
+slopes <- sapply(names(exps), function(exp) {
+  x <- exps[[exp]]
+  model <- lm(level ~ Cumulative.Processor.Energy_0.mWh., x)
+  coef <- model$coef
+  return(c(coef, exp=exp))
+})  %>%
+   t() %>%
+  as.data.frame(stringsAsFactors = FALSE) %>%
+  rename(battery_level = `(Intercept)`, slope = Cumulative.Processor.Energy_0.mWh.) %>%
+  mutate(battery_level = as.numeric(battery_level), slope = as.numeric(slope))
+ggplot(slopes, aes(battery_level, slope))+
+  geom_point(aes(color=exp))+
+  xlab('Windows Battery Report: battery %') +
+  theme_bw()
+```
+
+There exists a trend for stronger for greater battery drain to IPG measured power usage as the battery level decreases. This difference across battery level is non-negligable, but small, being around `r round(abs(diff(range(slopes$slope))/max(slopes$slope)*100))`%.
+
+# psutil and IPG
+
+The following is an identical methodology to the above, swapping the `psutil` measure of battery level with Battery Report. 
+
+## Single Run
+```{r, echo=FALSE}
+ggplot(exps[["0414_183804"]], aes(Cumulative.Processor.Energy_0.mWh., percent)) + 
+  geom_point(aes(color = exp), size = 0.2)  + 
+  geom_smooth(method='lm', aes(color = exp)) +
+  xlab('IPG: Cumulative Power Usage (mWh)') + 
+  ylab('psutil: battery %') + 
+  guides(color=FALSE) + 
+  theme_bw()
+```
+
+## All Runs
+
+Plotting all runs to see if there is any change of the observation above. 
+
+```{r, echo=FALSE}
+ggplot(exps_df, aes(Cumulative.Processor.Energy_0.mWh., percent)) + 
+  geom_point(aes(color = exp), size = 0.2)  + 
+  geom_smooth(method='lm', aes(color = exp)) + 
+  xlab('IPG: Cumulative Power Usage (mWh)') + 
+  ylab('psutil: battery %') + 
+  # guides(color=FALSE) + 
+  theme_bw()
+```
+
+## Relationship
+
+Calculating the slope of the relationship for each run:
+
+```{r, echo=FALSE}
+slopes <- sapply(names(exps), function(exp) {
+  x <- exps[[exp]]
+  model <- lm(percent ~ Cumulative.Processor.Energy_0.mWh., x)
+  coef <- model$coef
+  return(c(coef, exp=exp))
+})  %>%
+   t() %>%
+  as.data.frame(stringsAsFactors = FALSE) %>%
+  rename(battery_level = `(Intercept)`, slope = Cumulative.Processor.Energy_0.mWh.) %>%
+  mutate(battery_level = as.numeric(battery_level), slope = as.numeric(slope))
+ggplot(slopes, aes(battery_level, slope))+
+  geom_point(aes(color=exp))+
+  xlab('psutil: battery %') + 
+  theme_bw()
+
+```
+
+
+The same trend exists, but appears more non-linear and is somewhat weaker (`r round(abs(diff(range(slopes$slope))/max(slopes$slope)*100))`%).
+
+# Windows Battery Report and psutil
+
+Plotting the battery level reported by both software measures: 
+
+```{r, echo=FALSE}
+ggplot(exps_df, aes(percent, level*100))+
+  geom_point(aes(color=exp), size=0.2) +
+  geom_abline(slope=1, intercept=0, lty=2) + 
+  xlab('psutil: battery %') + 
+  ylab('Windows Battery Report: battery %')
+```
+
+The dotted line represents both measures reporting the same level. For a suite of experiments, Battery report is measuring low with respect to `psutil`.
+
+Fitting a line to the psutil to Battery Report relationship: 
+
+```{r, echo=FALSE}
+exps_norm <- lapply(exps, function(x) {
+  x$level_100 <- x$level*100
+  return(x)
+  })
+slopes <- sapply(names(exps_norm), function(exp) {
+  x <- exps_norm[[exp]]
+  model <- lm(percent ~ level_100, x)
+  coef <- model$coef
+  return(c(coef, exp=exp))
+})  %>%
+   t() %>%
+  as.data.frame(stringsAsFactors = FALSE) %>%
+  rename(battery_level = `(Intercept)`, slope = level_100) %>%
+  mutate(battery_level = as.numeric(battery_level), slope = as.numeric(slope))
+ggplot(slopes, aes(battery_level, slope))+
+  geom_point(aes(color=exp))+
+  xlab('intercept') + 
+  ylab('slope (psutil ~ battery report)')+
+  theme_bw()
+```
+
+It appears that runs with the discrepancy occur after 04/14 18:00.
+
+**Question**: Can this be replicated to determine a cause? 
+
+Table of Nightly build for each experiment:
+```{r, echo=FALSE}
+kable(props_df[order(props_df$exp), c('application_buildid', 'platform_buildid', 'exp')])
+```
+
+It doesn't appear to be an issue with the Firefox build. 

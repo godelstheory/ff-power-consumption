@@ -77,7 +77,7 @@ parse_log <- function(file_path){
 
 parse_ff_prop <- function(file_path){
   props <- read_json(file_path)
-  
+  return(props)
 }
 
 parse_psutil <- function(file_path, tz='US/Pacific'){
@@ -142,7 +142,7 @@ get_perf_data <- function(dir_path, exp_bounds = NULL){
   if (!file.exists(psutil_file_path)) psutil_file_path <- NULL
   # get the Windows battery report
   br_file_path <- file.path(dir_path, 'windows_battery_report_sampled_data.json')
-  if (!file.exists(psutil_file_path)) psutil_file_path <- NULL
+  if (!file.exists(br_file_path)) br_file_path <- NULL
   # merge
   df <- get_data(counter_file_path, ipg_file_path, psutil_file_path = psutil_file_path, 
                  battery_report_file_path = br_file_path, exp_bounds = exp_bounds)
