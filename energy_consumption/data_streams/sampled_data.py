@@ -95,7 +95,10 @@ class PsutilDataRetriever(SampledDataRetriever):
         for method_name in method_names:
             method = getattr(psutil, method_name)
             res = method()
-            dct.update({field: method_name for field in res._fields})
+            try:
+                dct.update({field: method_name for field in res._fields})
+            except:
+                dct.update({method_name: method_name})
         return dct
 
     def get_sample(self, **_):
@@ -103,7 +106,10 @@ class PsutilDataRetriever(SampledDataRetriever):
         for method_name in self.method_names:
             method = getattr(psutil, method_name)
             res = method()  # NamedTuples
-            counters.update(dict(zip(res._fields, res)))
+            try:
+                counters.update(dict(zip(res._fields, res)))
+            except:
+                counters.update({method_name: res})
         return counters
 
 
