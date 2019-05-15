@@ -108,6 +108,8 @@ class Experiment(ExperimentMeta):
             ff_exe_path = '/Applications/Firefox Nightly.app/Contents/MacOS/firefox'
         elif platform == 'win32':
             ff_exe_path = 'C:/Program Files/Firefox Nightly/firefox.exe'
+        elif 'linux' in platform:
+            ff_exe_path = '/usr/bin/firefox'
         else:
             raise ValueError('{}: {} platform currently not supported'.format(self.name, platform))
         return ff_exe_path
