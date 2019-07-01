@@ -33,7 +33,7 @@ exps <- names(datasets)
 perf_agg <- list()
 perf_lms <- list()
 for (exp in exps){
-  runs <- datasets[[exp]]
+  # runs <- datasets[[exp]]
   df <- datasets[[exp]] %>%
     lapply(function(x) x$perf) %>%
     bind_rows() %>%
@@ -596,10 +596,43 @@ plot_child_threads(google_child_threads, ymax = 8e8, p_names = p_names)
 p_names <- c('', 'Chrome_ChildThread', 'StreamTrans #2', 'Socket Thread', 'JS Helper')
 plot_child_threads(nyt_child_threads, ymax = 5e9, p_names = p_names, type='cpuUser')
 ```
+## `cnet`
+```{r}
+cpuKernel_delta_top[["exp_cnet_article"]]%>% arrange(delta) %>% distinct(name)
+```
+
+```{r}
+cpuUser_delta_top[['exp_cnet_article']]%>% arrange(delta) %>% distinct(name)
+```
+
+```{r}
+plot_perf_fits(perf_agg[['exp_cnet_article']], exp_name = 'exp_cnet_article')+
+    labs(title='CNET') +
+  xlab('Performance Counts') + 
+  ylab('CPU Battery Drain')
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+nyt_child_threads = child_threads[['exp_cnet_article']]
+
+p_names <- c('', 'Chrome_ChildThread', 'Socket Thread', 'JS Helper', 'DOM Worker', 'MediaPlayback #2', 'PaintThread')
+plot_child_threads(nyt_child_threads, ymax = 1.75e9, p_names = p_names)
+```
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c("", "Chrome_ChildThread", 'SocketThread', "ImgDecoder #2", "StyleThread#0", "StyleThread#1", "StyleThread#2", "PaintThread", "JS Helper")
+plot_child_threads(espncri_child_thread, ymax = 5e9, p_names = p_names, type='cpuUser')
+```
+
+```{r, fig.width = 12, fig.height = 8}
+p_names <- c('Socket Thread', 'JS Helper', 'DOM Worker', 'PaintThread') #, 'MediaPlayback #2')
+plot_child_threads(nyt_child_threads, ymax = 3e8, p_names = p_names)
+```
 
 
 # Modeling 
 
+## Simple Steady-State Model
 First look into a simple model: relate to overall battery drain
 * Look at net deltas for named threads across experiment
 * Ignore unnamed threads
@@ -613,6 +646,7 @@ total_battery_drain <- list()
 for(exp_name in names(perf_agg)){
   battery_delta <- perf_agg[[exp_name]] %>%
     group_by(run_id) %>%
+    # summarize(drain = diff(range(battery_drain))[1]) %>%
     summarize(drain = diff(range(battery_drain))[1]) %>%
     mutate(run_id = as.numeric(run_id)) %>%
     add_column(exp=exp_name)
@@ -718,8 +752,152 @@ ggplot(features_m1_spread, aes(predictions, drain)) +
 
 ```
 
-**Next**
-_Add in performance counters (mean difference or sum of steady state)_
+## Simple Model: Add in performance counters
+Add in performance counters as an additional feature: the delta between the start and end values.
+
+```{r}
+total_counter <- list()
+for(exp_name in names(perf_agg)){
+  counter_delta <- perf_agg[[exp_name]] %>%
+    group_by(run_id) %>%
+    summarize(counter_delta = diff(range(counts))[1]) %>%
+    mutate(run_id = as.numeric(run_id)) %>%
+    add_column(exp=exp_name)
+  total_counter[[exp_name]] <- counter_delta
+t_c_df <- bind_rows(total_counter)
+}
+```
+
+```{r}
+features_m1_spread %>% 
+  inner_join(t_c_df) -> features_m2
+```
+```{r}
+full_lm_2 <- lm(drain ~ cpuKernel + cpuUser + counter_delta, features_m2)
+features_m2$predictions <- predict(full_lm_2)
+ggplot(features_m2, aes(drain, predictions)) +
+  geom_point(aes(color=exp))+
+  guides(color=FALSE) + 
+  geom_abline(slope=1, linetype='dashed', color='black') +
+  ylab('Model Prediction') + 
+  xlab('CPU Total Battery Drain') 
+
+```
+
+
+## Simple Model: Add in performance counters and unnamed threads
+Add in performance counters as an additional feature: the delta between the start and end values.
+
+```{r}
+noname_child_measures_features<-function(exp_name, dfs){
+  exps <- list()
+  exp <- dfs[[exp_name]]
+  for(run_id in 1:length(exp)){
+    exp[[run_id]] %>%
+      mutate(delta =replace(delta, delta<0, 0)) %>%
+      filter(name == '' & second > 70 & second < 120) %>%
+      group_by(type) %>%
+      summarise(no_name_sum = sum(delta)) %>%
+      add_column(run_id = run_id, exp = exp_name) -> result
+    exps[[run_id]] <- result
+  }
+  return(bind_rows(exps))
+}
+c_noname_features <- lapply(names(child_measures), noname_child_measures_features, dfs = child_measures)
+
+```
+
+```{r}
+c_noname_features_df <- bind_rows(c_noname_features) %>% 
+  arrange(desc(no_name_sum)) %>%
+  spread(type, no_name_sum) %>%
+  rename(cpuKernel_noname = cpuKernel, cpuUser_noname = cpuUser)
+# c_noname_features_df
+```
+
+```{r}
+features_m3 <- c_features_df %>%
+  spread(type, sum) %>%
+  inner_join(c_noname_features_df) 
+```
+
+
+```{r}
+features_m3 %>% 
+  inner_join(t_b_df)  %>%
+  inner_join(t_c_df) -> features_m3_full
+```
+
+```{r}
+full_lm_3 <- lm(drain ~ cpuKernel + cpuUser + counter_delta + cpuKernel_noname + cpuUser_noname, features_m3_full)
+features_m3_full$predictions <- predict(full_lm_3)
+ggplot(features_m3_full, aes(drain, predictions)) +
+  geom_point(aes(color=exp))+
+  guides(color=FALSE) + 
+  geom_abline(slope=1, linetype='dashed', color='black') +
+  ylab('Model Prediction') + 
+  xlab('CPU Total Battery Drain') 
+
+```
+
+
+## Sample By Sample Model:
+NOT COMPLETE: How to deal with all the zeros?
+```{r}
+child_measures_features_sample<-function(exp_name, dfs){
+  exps <- list()
+  exp <- dfs[[exp_name]]
+  for(run_id in 1:length(exp)){
+    exp[[run_id]] %>%
+      mutate(delta=replace(delta, delta<0, 0)) %>%
+      filter(name != '' & second > 70 & second < 120) %>%
+      group_by(type, second) %>%
+      summarise(sum = sum(delta)) %>%
+      add_column(run_id = run_id, exp = exp_name) -> result
+    exps[[run_id]] <- result
+  }
+  return(bind_rows(exps))
+}
+c_features_sample <- lapply(names(child_measures), child_measures_features_sample, dfs = child_measures)
+```
+
+```{r}
+c_features_sample_df <- bind_rows(c_features_sample) %>%
+  spread(type, sum)
+c_features_sample_df
+```
+
+
+```{r}
+perf_agg_clean <- list()
+count <- 1
+for(exp in perf_agg){
+  exp %>% mutate(run_id = as.numeric(as.character(run_id))) %>%
+    select(run_id, exp, stopwatch, counts,  battery_drain) %>%
+    mutate(second = stopwatch+70, battery_drain = battery_drain - lag(battery_drain),
+           counts = counts - lag(counts)) %>%
+    na.omit() -> exp_clean
+  perf_agg_clean[[count]] <- exp_clean
+  count <- count + 1
+}
+b_df <- bind_rows(perf_agg_clean)
+```
+
+```{r}
+c_features_sample_df %>%
+  inner_join(b_df) -> features_sample 
+```
+```{r}
+sample_lm_1 <- lm(battery_drain ~ cpuKernel + cpuUser + counts, features_sample)
+features_sample$predictions <- predict(sample_lm_1)
+ggplot(features_sample, aes(battery_drain, predictions)) +
+  geom_point(aes(color=exp))+
+  guides(color=FALSE) + 
+  geom_abline(slope=1, linetype='dashed', color='black') +
+  ylab('Model Prediction') + 
+  xlab('CPU Total Battery Drain') 
+
+```
 
 
 Upon looking at the child thread behavior, an initial predictive model can be proposed. 
@@ -770,3 +948,56 @@ The feature set is as follows:
 4. Give why Lingscars, Twitch so heavy
 
 
+# Additional Work: 06/28/2019
+
+Create an aggregated version of the number of threads per child process over time plot.
+
+```{r}
+rt_exp = datasets[['exp_rt_article']]
+
+get_num_threads <- function(measure){
+  return(sapply(measure$processes$process$children, function(x) length(x$threads)))
+}
+
+get_num_child_threads <- function(run_id, runs){
+  run = runs[[run_id]]
+  process = run$process
+  seconds <- get_seconds(process)
+  num_ct.df <- sapply(process, get_num_threads)  %>%
+    data.frame %>% 
+    t %>% 
+    as.data.frame %>%
+    # set_colnames(str_replace(names(.), 'V', 'Child_')) %>%
+    set_colnames(c('content #1', 'extension', 'content #2', 'gpu')) %>%
+    mutate(seconds = seconds) %>%
+    gather('child', 'num_threads', -seconds ) %>%
+    mutate(run_id = run_id)
+  return(num_ct.df)
+}
+
+count_threads <- function(exp_name){
+  exp <- datasets[[exp_name]]
+  df <- 1:length(exp) %>%
+    lapply(get_num_child_threads, runs=exp) %>%
+    bind_rows() %>%
+    mutate(exp = exp_name)
+  return(df)
+}
+
+num_threads_df <- names(datasets) %>%
+  lapply(count_threads) %>%
+  bind_rows()
+```
+
+```{r}
+ggplot(
+  num_threads_df %>%
+    mutate(bins = cut(seconds, breaks=10, labels=FALSE)) %>%
+    rename("Child Process" = 'child') %>%
+    mutate(bins=as.factor((bins+1)*10)), aes(x=bins, y=num_threads)) +
+  # geom_boxplot(aes(color=`Child Process`)) + 
+  geom_boxplot(aes(color=`Child Process`)) + 
+  labs(y = 'Number of Threads', x = 'Experiment Duration (sec)', title = '# of Threads per Child Process throught experiment') + 
+  geom_vline(xintercept=5, linetype='dashed', color='black', alpha=0.7)
+  
+```
