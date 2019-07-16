@@ -1,5 +1,5 @@
 # Drive Firefox
-marionette-driver==2.7.0
+marionette-driver==2.8.0
 
 # Data munging
 numpy==1.15.1
