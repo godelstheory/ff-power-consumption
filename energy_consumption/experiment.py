@@ -107,7 +107,16 @@ class Experiment(ExperimentMeta):
         client = Marionette('localhost', port=2828, bin=self.get_ff_default_path(), prefs=exp_prefs,
                             gecko_log='-')
         client.start_session()
+        # double-check the prefs
+        self.check_prefs(client)
         return client
+
+    def check_prefs(self, client):
+        """Double-check the preferences on the client to ensure they are as the user intended """
+        for pref, value in self.prefs.iteritems():
+            c_pref = client.get_pref(pref)
+            if c_pref != self.prefs[pref]:
+                raise ValueError('Pref mismatch: client {}, provided {}')
 
     def get_ff_default_path(self):
         platform = sys.platform.lower()
