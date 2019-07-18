@@ -84,15 +84,15 @@ def run_exp(exp_id, uris, **kwargs):
                     # Task("time.sleep(30)", self.client),
                     Task(c, self.client, meta={'task': 'newtab_open'}),
                     Task("self.client.navigate('{}')".format(uri[1]), self.client, meta={'website': uri[0]}),
-                    # Task("time.sleep(60)", self.client)
-                    Task("time.sleep(2)", self.client)
+                    Task("time.sleep(60)", self.client)
+                    # Task("time.sleep(2)", self.client)
                 ]
                 )
             return tasks
 
     exp_name = path.splitext(path.basename(__file__))[0]
     exp = ExperimentTp100(
-        exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=45, # duration=1350,
+        exp_id=exp_id, exp_name=exp_name, tasks=TasksTest(), duration=1350,
         sampled_data_retrievers=(sd.PerformanceProcessesRetriever(), sd.PsutilDataRetriever(),
                                  sd.WindowsBatteryReportRetriever()),
         prefs=prefs,
