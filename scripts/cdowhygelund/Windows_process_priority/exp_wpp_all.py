@@ -96,7 +96,7 @@ def run_exp(exp_id, uris, **kwargs):
         sampled_data_retrievers=(sd.PerformanceProcessesRetriever(), sd.PsutilDataRetriever(),
                                  sd.WindowsBatteryReportRetriever()),
         prefs=prefs,
-        battery_thresh=(40, 100)
+        battery_thresh=(75, 95)
     )
 
     exp.run(wait_interval=10, split_task=False)
@@ -105,7 +105,9 @@ def run_exp(exp_id, uris, **kwargs):
 
 
 samples_per_page = 10
-for i in range(samples_per_page):
+shuffles = 5
+for j in range(shuffles):
     shuffle(pages)
-    for cohort, prefs in exp_prefs.iteritems():
-        run_exp('run_{}_{}'.format(i, cohort), pages, prefs=prefs)
+    for i in range(samples_per_page):
+        for cohort, prefs in exp_prefs.iteritems():
+            run_exp('run_{}_shuff_{}_{}'.format(i, j, cohort), pages, prefs=prefs)
