@@ -67,6 +67,19 @@ exp_prefs = {
     'cohort_4': {'privacy.trackingprotection.enabled': True,
                 "media.autoplay.default": 1,
                 "dom.ipc.processPriorityManager.enabled": False},
+    'cohort_5': {'privacy.trackingprotection.enabled': False,
+                "media.autoplay.default": 0,
+                "dom.ipc.processPriorityManager.enabled": True},
+    'cohort_6': {'privacy.trackingprotection.enabled': False,
+                "media.autoplay.default": 0,
+                "dom.ipc.processPriorityManager.enabled": False},
+    'cohort_7': {'privacy.trackingprotection.enabled': False,
+                "media.autoplay.default": 1,
+                "dom.ipc.processPriorityManager.enabled": True},
+    'cohort_8': {'privacy.trackingprotection.enabled': False,
+                "media.autoplay.default": 1,
+                "dom.ipc.processPriorityManager.enabled": False},
+
 }
 
 
@@ -104,8 +117,8 @@ def run_exp(exp_id, uris, **kwargs):
     time.sleep(10)
 
 
-samples_per_page = 10
-shuffles = 5
+samples_per_page = 5
+shuffles = 20
 for j in range(shuffles):
     shuffle(pages)
     for i in range(samples_per_page):
