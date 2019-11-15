@@ -1,0 +1,78 @@
+---
+title: 'Windows Process Priority: Impact on Batery Usage'
+output:
+  html_notebook:
+    theme: cosmo
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+date: 'Last Updated: `r format(Sys.time(), "%B %d, %Y")`'
+---
+
+# tl;dr 
+
+A series of experiments were performed to determine the impact the the Windows Process Priority Manager (`dom.ipc.processPriorityManager.enabled`) has on battery consumption. In addition, the following prefs were also tested to determine the potential degree of impact:
+
+* `privacy.trackingprotection.enabled` (tracking protection)
+* `media.autoplay.default` (block autoplay)
+  
+The Process Priority Manager has no observed impact on battery usage. However, tracking protection significantly reduces power demand, while blocking autoplay has a smaller, but measurable influence. 
+
+# Description
+The experiment utilized a list of 22 URLs, used in previous [experiments](https://metrics.mozilla.com/protected/cdowhygelund/blockautoplay_analysis.html). 
+
+Start with a list of URIs:
+
+
+1. Open Firefox and wait 2 seconds
+2. Open the first URI and wait 60 seconds
+3. Open a new tab, shift the focus, open the next URI and wait 60 seconds.
+4. Repeat 3 for each URI.
+5. Once each URI has been opened, shutdown Firefox. 
+6. Change to the next set of preferences. Do steps 1-5
+
+The above is done five times for a given page ordering. There 10 random shuffles of the page ordering, to yield a total of 50 runs through the URIs for a set of preference settings. 
+
+```{r imports, echo=FALSE}
+source('../data_munge.R')
+```
+
+```{r load, echo=FALSE}
+load('data/wpp_exp_all_eda.RData')
+```
+
+# Results
+
+## Windows Process Priority Manager
+The following plot shows the cumulative processor power usage through time, with the `dom.ipc.processPriorityManager.enabled` set to `True` or `False`. The boxplots contain all values between the time range given in the x-axis. There is no observed difference through time in battery usage, in changing the preference value. 
+
+```{r wpp_boxplot, fig.width=10, fig.height=10, echo=FALSE}
+ggplot(exps_df %>% mutate(stps=cut_width(exps_df$stopwatch, 100)) %>% filter(stopwatch < 25000), aes(stps, Cumulative.Processor.Energy_0.mWh.)) + 
+  geom_boxplot(aes(fill=wpp)) + 
+  ylab('IPG: Cumulative Power Usage (mWh)') + 
+  xlab('Experiment Duration (s)') + 
+  theme_bw()
+```
+
+## Tracking Protection
+There is a significantly reduced cumulative processor power consumption enabling the `privacy.trackingprotection.enabled`. This is observed throughout the experiment. In addition, the distribution is narrower with this preference flipped on.
+
+```{r tp_boxplot, fig.width=10, fig.height=10, echo=FALSE}
+ggplot(exps_df %>% mutate(stps=cut_width(exps_df$stopwatch, 100)) %>% filter(stopwatch < 25000), aes(stps, Cumulative.Processor.Energy_0.mWh.)) + 
+ geom_boxplot(aes(fill=tp)) + 
+  ylab('IPG: Cumulative Power Usage (mWh)') + 
+  xlab('Experiment Duration (s)') + 
+  theme_bw()
+```
+
+## Block Autoplay
+A smaller, but significant, effect is observed for the `media.autoplay.default` preference. 
+
+```{r ba_boxplot, fig.width=10, fig.height=10, echo=FALSE}
+ggplot(exps_df %>% mutate(stps=cut_width(exps_df$stopwatch, 100)) %>% filter(stopwatch < 25000), aes(stps, Cumulative.Processor.Energy_0.mWh.)) + 
+ geom_boxplot(aes(fill=block_autoplay)) + 
+  ylab('IPG: Cumulative Power Usage (mWh)') + 
+  xlab('Experiment Duration (s)') + 
+  theme_bw()
+```
