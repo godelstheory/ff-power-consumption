@@ -19,7 +19,7 @@ Description:
 Testing Windows Priority Manager impact on power consumption (https://bugzilla.mozilla.org/show_bug.cgi?id=1556458). 
 
 Start with a list of URIs:
-1. Open Firefox and wait 60 seconds
+1. Open Firefox and wait 2 seconds
 2. Open the first URI and wait 60 seconds
 3. Open a new tab, shift the focus, open the next URI and wait 60 seconds.
 4. Repeat 3 for each URI.
