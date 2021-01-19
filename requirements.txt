@@ -9,7 +9,7 @@ scipy==1.1.0
 statsmodels==0.9.0
 
 # Retrieve process information
-psutil==5.4.8
+psutil==5.6.6
 
 # Mystery reqs
 structlog==18.2.0
