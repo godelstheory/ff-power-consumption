@@ -15,9 +15,3 @@ Once installed, run experiment scripts from another directory (a directory you w
 $python FF-power-consumption/scripts/cdowhygelund/Experiment\ -\ V0\ -\ high.py
 ```
 
-## Development/hacking
-Felix plans to develop on his main machine, then rsync the package to the (mac) test laptop:
-```
-rsync -ar --delete ~/Code/FF-power-consumption felix@felix-ec.local:/Users/felix/
-```
-run (after installing once with `-e`) on the test laptop, then analyze the data from a notebook on his main machine that directly accesses the test laptop's data using sftp. This requires that the experiment script be invoked from *outside* the repo, else the data will be wiped on the next rsync.
